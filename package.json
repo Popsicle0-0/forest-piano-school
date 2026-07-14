@@ -1,0 +1,20 @@
+{
+  "name": "forest-piano-school",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "面向 5-10 岁儿童的钢琴启蒙互动网页 - 森林钢琴学校",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "gsap": "^3.12.5",
+    "tone": "^15.0.4",
+    "canvas-confetti": "^1.9.3"
+  }
+}
