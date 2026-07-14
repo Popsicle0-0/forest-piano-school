@@ -15,6 +15,11 @@
  *   - 第一个键超过 2 秒没配对: 重置 (不能只按一个)
  *
  * 通关条件: 完成 5 题.
+ *
+ * 增强 (polish):
+ *  - 当前题 HUD: 老师脚下显示 "Fa 上 + Do 下" 等
+ *  - 答对时: 老师举手庆祝 (level6-clap class), 同时双键 chord-preview (音几乎同时 + 闪和弦标记)
+ *  - 键盘左右区颜色更鲜明 (CSS .level6-lh/.level6-rh)
  */
 import { Level6Scene } from '../components/Level6Scene.js';
 import { PianoKeyboard } from '../components/PianoKeyboard.js';
@@ -76,7 +81,7 @@ export default function startLevel6(game) {
   // 2) 渲染键盘
   game.kb = new PianoKeyboard(game.stage, NOTES);
 
-  // 3) 给键盘按区上色 (LH = 绿, RH = 黄)
+  // 3) 给键盘按区上色 (LH = 绿, RH = 黄) + 加小标签
   setTimeout(() => {
     if (!game.kb || !game.kb.svg) return;
     NOTES.forEach((n) => {
@@ -128,6 +133,19 @@ export default function startLevel6(game) {
     });
   }
 
+  /**
+   * Chord-preview: 双音几乎同时播 (毫秒级错位), 给"和声"感
+   * 用 setTimeout 把第二个延后 8ms, 避免完全同步导致的音频合并
+   */
+  function playChord(pitch1, pitch2) {
+    try {
+      game.audio.playNote(pitch1);
+      setTimeout(() => {
+        try { game.audio.playNote(pitch2); } catch (_) {}
+      }, 8);
+    } catch (_) {}
+  }
+
   function presentChord(idx) {
     if (idx >= CHORDS.length) {
       return level6Win();
@@ -141,12 +159,14 @@ export default function startLevel6(game) {
     const lowNote = NOTES.find((n) => n.id === chord.low);
     game.say(`第 ${idx + 1} / ${CHORDS.length} 题: 请同时按 ${highNote.solfege} (右手) + ${lowNote.solfege} (左手) ✨`);
 
-    // 视觉高亮 + 试奏一下
+    // 更新老师脚下的和弦指示
+    try { game.scene.setChordLabel(chord.label); } catch (_) {}
+
+    // 视觉高亮 + 试奏 (chord-preview, 用 setTimeout 错位)
     setTimeout(() => hintChord(chord), 300);
     setTimeout(() => {
       try {
-        game.audio.playNote(highNote.pitch);
-        game.audio.playNote(lowNote.pitch);
+        playChord(highNote.pitch, lowNote.pitch);
       } catch (_) {}
     }, 600);
   }
@@ -157,6 +177,7 @@ export default function startLevel6(game) {
     try { game.progress.markLevelComplete(6, stars); } catch (_) {}
     try { game.audio.playScale(SCALE); } catch (_) {}
     game.say('双手小钢琴家毕业! 🎓🎹');
+    try { game.scene.setChordLabel('毕业啦'); } catch (_) {}
     setTimeout(() => {
       try { game.showWinOverlay(stars, 6); } catch (_) {}
     }, 1200);
@@ -228,13 +249,18 @@ export default function startLevel6(game) {
 
     const id1 = cur.id;
     const id2 = secondKeyEl.dataset.id;
-    // 双键播音 (几乎同时)
-    try {
-      const n1 = NOTES.find((n) => n.id === id1);
-      const n2 = NOTES.find((n) => n.id === id2);
-      if (n1) game.audio.playNote(n1.pitch);
-      if (n2) game.audio.playNote(n2.pitch);
-    } catch (_) {}
+    const n1 = NOTES.find((n) => n.id === id1);
+    const n2 = NOTES.find((n) => n.id === id2);
+
+    // 双键 chord-preview (8ms 错位, 给和声感而非完全同步)
+    if (n1 && n2) {
+      playChord(n1.pitch, n2.pitch);
+    } else {
+      try {
+        if (n1) game.audio.playNote(n1.pitch);
+        if (n2) game.audio.playNote(n2.pitch);
+      } catch (_) {}
+    }
 
     // 视觉: 两个键都亮
     [id1, id2].forEach((id) => {
@@ -262,6 +288,9 @@ export default function startLevel6(game) {
     if (hudDotEls[game._level6Correct - 1]) {
       hudDotEls[game._level6Correct - 1].classList.add('on');
     }
+
+    // 老师举手庆祝 (chord-preview 后给 0.15s 视觉反馈)
+    try { game.scene.celebrateClap(); } catch (_) {}
 
     // 飘字
     try {

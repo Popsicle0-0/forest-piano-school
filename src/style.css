@@ -1187,6 +1187,141 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   color: var(--text-sub);
   opacity: 0.6;
 }
+
+/* === v18.1: Level 2 polish — 听声音提示 + 倒计时 + 答对反馈 === */
+.level2-listen-prompt {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 248, 220, 0.92);
+  border: 3px solid rgba(255, 209, 102, 0.85);
+  border-radius: 24px;
+  padding: 8px 16px 8px 10px;
+  box-shadow: 0 6px 20px rgba(255, 159, 28, 0.25);
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-weight: 900;
+  color: #b35900;
+  opacity: 0;
+  transition: opacity 280ms ease-out, transform 280ms ease-out;
+  pointer-events: none;
+}
+.level2-listen-prompt.active {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.level2-speaker {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.level2-speaker-emoji {
+  font-size: 24px;
+  z-index: 2;
+  filter: drop-shadow(0 0 4px rgba(255, 209, 102, 0.6));
+}
+.level2-wave {
+  position: absolute;
+  top: 50%;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border: 3px solid #ff9f1c;
+  border-left: none;
+  border-bottom: none;
+  border-radius: 0 50% 0 0;
+  transform: translateY(-50%) rotate(45deg);
+  opacity: 0;
+  pointer-events: none;
+}
+.level2-listen-prompt.active .level2-wave {
+  animation: level2Wave 1.4s ease-out infinite;
+}
+.level2-wave-2 { animation-delay: 0.25s !important; width: 18px; height: 18px; }
+.level2-wave-3 { animation-delay: 0.5s !important; width: 24px; height: 24px; }
+@keyframes level2Wave {
+  0%   { opacity: 0; transform: translateY(-50%) rotate(45deg) scale(0.4); }
+  30%  { opacity: 0.85; }
+  100% { opacity: 0; transform: translateY(-50%) rotate(45deg) scale(1.1); }
+}
+.level2-listen-text {
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+/* 倒计时进度点 — 5 格, 已答对填色 */
+.level2-progress-dots {
+  position: absolute;
+  bottom: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 22;
+  pointer-events: none;
+}
+.level2-prog-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  border: 2px solid rgba(255, 179, 71, 0.7);
+  transition: background 280ms, transform 280ms, box-shadow 280ms;
+}
+.level2-prog-dot.filled {
+  background: #ffd166;
+  transform: scale(1.25);
+  box-shadow: 0 0 10px rgba(255, 209, 102, 0.7);
+}
+
+/* 答对泡泡 */
+.level2-correct-bubble {
+  position: absolute;
+  z-index: 30;
+  background: linear-gradient(135deg, #ffd166, #ff9f1c);
+  color: #1a1420;
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-weight: 900;
+  font-size: 16px;
+  padding: 6px 14px;
+  border-radius: 18px;
+  transform: translate(-50%, 0) scale(0.4);
+  animation: level2BubblePop 1.4s ease-out forwards;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(255, 159, 28, 0.5);
+}
+@keyframes level2BubblePop {
+  0%   { opacity: 0; transform: translate(-50%, 10px) scale(0.4); }
+  25%  { opacity: 1; transform: translate(-50%, -10px) scale(1.1); }
+  70%  { opacity: 1; transform: translate(-50%, -22px) scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(0.9); }
+}
+
+/* 火花 */
+.level2-sparkle {
+  position: absolute;
+  z-index: 30;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+  background: radial-gradient(circle, #ffd166 0%, rgba(255, 209, 102, 0) 70%);
+  border-radius: 50%;
+  animation: level2Sparkle 1s ease-out forwards;
+}
+@keyframes level2Sparkle {
+  0%   { opacity: 0; transform: scale(0.3); }
+  40%  { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 0; transform: scale(0.2); }
+}
+
 .hud__btn--small {
   width: 36px;
   height: 36px;
@@ -1675,6 +1810,73 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   50%      { transform: rotate(8deg); }
 }
 
+/* === Level 3 polish: 平台色块提示 / 日落渐变 / 抖动 / 粒子绽放 === */
+
+/* 每个平台顶部的颜色条 (Do 红 / Mi 黄 / Sol 蓝) */
+.level3-platform-top--do  { fill: #e63946 !important; filter: drop-shadow(0 0 4px rgba(230,57,70,0.6)); }
+.level3-platform-top--mi  { fill: #ffc971 !important; filter: drop-shadow(0 0 4px rgba(255,201,113,0.6)); }
+.level3-platform-top--sol { fill: #457b9d !important; filter: drop-shadow(0 0 4px rgba(69,123,157,0.6)); }
+
+/* 平台身的轻微色调提示 — 让 Do 山偏红棕, Mi 山偏黄绿, Sol 山偏蓝绿 */
+.level3-platform-body--do  { fill: #a85a3a !important; }
+.level3-platform-body--mi  { fill: #a89a4a !important; }
+.level3-platform-body--sol { fill: #4a6f8a !important; }
+
+/* 平台内的小色块提示条 (装饰性, 让色感更明显) */
+.level3-platform-hint--do  { fill: #ffd9d9; opacity: 0.85; }
+.level3-platform-hint--mi  { fill: #fff3c4; opacity: 0.85; }
+.level3-platform-hint--sol { fill: #cfe0f0; opacity: 0.85; }
+
+/* 日落渐变遮罩 — 初始 progress-0 几乎透明, 越往后越紫橙 */
+.level3-sunset-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  transition: background 1.2s ease-out, opacity 1.2s ease-out;
+}
+.level3-progress-0 { background: rgba(255, 200, 120, 0.0); opacity: 0; }
+.level3-progress-1 { background: linear-gradient(180deg, rgba(255, 170, 80, 0.18) 0%, rgba(231, 111, 81, 0.22) 60%, rgba(140, 90, 60, 0.25) 100%); opacity: 1; }
+.level3-progress-2 { background: linear-gradient(180deg, rgba(231, 111, 81, 0.32) 0%, rgba(155, 93, 229, 0.28) 60%, rgba(74, 58, 110, 0.35) 100%); opacity: 1; }
+.level3-progress-3 { background: linear-gradient(180deg, rgba(106, 76, 147, 0.45) 0%, rgba(54, 21, 84, 0.45) 60%, rgba(20, 12, 40, 0.55) 100%); opacity: 1; }
+
+/* 3 座山整体抖动 (distractor 提示) */
+.level3-shake {
+  animation: level3Shake 0.5s ease-in-out;
+}
+@keyframes level3Shake {
+  0%, 100% { transform: translateX(0); }
+  10%  { transform: translateX(-6px); }
+  25%  { transform: translateX(6px); }
+  40%  { transform: translateX(-4px); }
+  55%  { transform: translateX(4px); }
+  70%  { transform: translateX(-2px); }
+  85%  { transform: translateX(2px); }
+}
+
+/* 粒子绽放层 — 答对时山脚散出一圈金色光斑 */
+.level3-bloom-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.level3-bloom-sparkle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px currentColor, 0 0 16px rgba(255, 240, 180, 0.6);
+  animation: level3BloomSparkle 1s ease-out forwards;
+  opacity: 0;
+}
+@keyframes level3BloomSparkle {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  20%  { transform: translate(calc(-50% + var(--bx, 0px) * 0.4), calc(-50% + var(--by, 0px) * 0.4)) scale(1.2); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--bx, 0px)), calc(-50% + var(--by, 0px))) scale(0.6); opacity: 0; }
+}
+
 /* === v17.8: Level 5 小星星视奏 === */
 .level5-background {
   position: absolute;
@@ -1747,6 +1949,73 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   60% { transform: translateX(-4px); }
   80% { transform: translateX(4px); }
 }
+
+/* === v18.1: Level 5 polish — 指挥家 + 节拍器 + 轻松模式 === */
+.level5-conductor {
+  pointer-events: none;
+  animation: conductorBob 2.4s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes conductorBob {
+  0%, 100% { transform: translate(120px, 18px) translateY(0); }
+  50%      { transform: translate(120px, 18px) translateY(-3px); }
+}
+.level5-conductor-arm-r {
+  transform-origin: 7px 13px;
+  transform-box: fill-box;
+  animation: conductorBatonR 1.2s ease-in-out infinite;
+}
+.level5-conductor-arm-l {
+  transform-origin: -7px 13px;
+  transform-box: fill-box;
+  animation: conductorBatonL 1.2s ease-in-out infinite;
+}
+@keyframes conductorBatonR {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-22deg); }
+}
+@keyframes conductorBatonL {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(18deg); }
+}
+
+.level5-metronome {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 22;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  background: rgba(20, 12, 40, 0.65);
+  color: #fff8a8;
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-weight: 900;
+  padding: 6px 12px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 248, 168, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  transition: background 300ms, border-color 300ms;
+}
+.level5-metronome-note { font-size: 16px; }
+.level5-metronome-bpm  { font-size: 20px; line-height: 1; min-width: 28px; text-align: center; }
+.level5-metronome-mode {
+  font-size: 11px;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(144, 238, 144, 0.2);
+  color: #90ee90;
+  border: 1px solid rgba(144, 238, 144, 0.5);
+  display: none;
+}
+.level5-metronome--easy {
+  background: rgba(20, 60, 30, 0.7);
+  border-color: rgba(144, 238, 144, 0.7);
+}
+.level5-metronome--easy .level5-metronome-mode { display: inline-block; }
 
 /* === v17.9: Level 8 森林音乐会 + 舞台 === */
 .level8-background {
@@ -1978,6 +2247,124 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   animation: noteWiggle 0.3s ease-in-out;
 }
 
+/* === v18.1: Level 8 polish — 麦克风 + 动物观众 cheer + 演奏徽章 + 截图按钮 === */
+.level8-mic {
+  pointer-events: none;
+  animation: micBob 2.6s ease-in-out infinite;
+  transform-origin: center bottom;
+  transform-box: fill-box;
+  filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.45));
+}
+@keyframes micBob {
+  0%, 100% { transform: translate(255px, 380px) rotate(0deg); }
+  50%      { transform: translate(255px, 380px) rotate(-3deg); }
+}
+.level8-mic-head {
+  animation: micGlow 1.6s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes micGlow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255, 209, 102, 0.5)); }
+  50%      { filter: drop-shadow(0 0 8px rgba(255, 235, 100, 0.95)); }
+}
+
+.level8-audience {
+  pointer-events: none;
+}
+.level8-animal {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: animalSway 3.4s ease-in-out infinite;
+}
+.level8-animal--bear  { animation-delay: -0.5s; }
+.level8-animal--deer  { animation-delay: -1.4s; }
+.level8-animal--fox   { animation-delay: -2.1s; }
+@keyframes animalSway {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+.level8-animal-arm-l,
+.level8-animal-arm-r {
+  transform-box: fill-box;
+  transform-origin: 0 0;
+  transition: transform 240ms ease-out;
+}
+/* cheer 时举手 — 用 transform: rotate 让手臂抬起 */
+.level8-audience.level8-cheer .level8-animal-arm-l {
+  transform: rotate(-130deg);
+}
+.level8-audience.level8-cheer .level8-animal-arm-r {
+  transform: rotate(130deg);
+}
+.level8-audience.level8-cheer .level8-animal {
+  animation: animalJump 0.6s ease-out;
+}
+@keyframes animalJump {
+  0%   { transform: translateY(0) scale(1); }
+  35%  { transform: translateY(-14px) scale(1.06); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.level8-playing-badge {
+  background: linear-gradient(135deg, #ffd166, #ff9f1c);
+  color: #1a1420;
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-weight: 900;
+  font-size: 14px;
+  padding: 6px 14px;
+  border-radius: 14px;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 12px rgba(255, 159, 28, 0.5);
+  animation: pulseBadge 1.6s ease-in-out infinite;
+}
+
+/* v18.1: 截图按钮 + 完成印章 */
+.level8-snapshot-panel {
+  position: absolute;
+  bottom: 110px;
+  right: 16px;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.level8-snapshot-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd166, #ff9f1c);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 18px rgba(255, 159, 28, 0.55);
+  font-size: 28px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 200ms ease-out;
+}
+.level8-snapshot-btn:hover { transform: scale(1.08); }
+.level8-snapshot-btn:active,
+.level8-snapshot-btn.clicked { transform: scale(0.92); }
+.level8-completed-stamp {
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  padding: 8px 18px;
+  border-radius: 16px;
+  background: rgba(15, 10, 30, 0.92);
+  color: #ffd166;
+  border: 2px solid rgba(255, 209, 102, 0.7);
+  opacity: 0;
+  transform: translateY(8px) scale(0.8) rotate(-8deg);
+  transition: opacity 360ms ease-out, transform 360ms cubic-bezier(.34,1.56,.64,1);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.level8-completed-stamp.show {
+  opacity: 1;
+  transform: translateY(0) scale(1) rotate(-4deg);
+}
+
 /* === v17.8: Level 6 钢琴教室 === */
 .level6-background {
   position: absolute;
@@ -2078,6 +2465,90 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 /* 左右手标签 (白字带描边) */
 .level6-hand-tag {
   user-select: none;
+}
+
+/* === Level 6 polish: 节拍器 + 老师拍手 + 当前和弦指示 + 更鲜明的分区 === */
+
+/* 老师举手庆祝 — 整组老师抬升 + 双手抬起, 1.2s */
+.level6-clap .level6-hand--l {
+  animation: level6ClapLeft 1.2s ease-in-out;
+  transform-origin: bottom center;
+}
+.level6-clap .level6-hand--r {
+  animation: level6ClapRight 1.2s ease-in-out;
+  transform-origin: bottom center;
+}
+@keyframes level6ClapLeft {
+  0%   { transform: translate(-32px, 32px) rotate(0deg); }
+  20%  { transform: translate(-20px, 10px) rotate(-30deg); }
+  45%  { transform: translate(-4px, -2px) rotate(-50deg); }
+  60%  { transform: translate(-4px, -2px) rotate(-50deg); }
+  100% { transform: translate(-32px, 32px) rotate(0deg); }
+}
+@keyframes level6ClapRight {
+  0%   { transform: translate(32px, 32px) rotate(0deg); }
+  20%  { transform: translate(20px, 10px) rotate(30deg); }
+  45%  { transform: translate(4px, -2px) rotate(50deg); }
+  60%  { transform: translate(4px, -2px) rotate(50deg); }
+  100% { transform: translate(32px, 32px) rotate(0deg); }
+}
+
+/* 节拍器摆杆左右摇晃 (60 BPM ≈ 0.5s 一次) */
+.level6-metronome {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
+}
+.level6-metronome-arm {
+  transform-origin: 0 20px;
+  animation: level6MetronomeTick 1s ease-in-out infinite;
+}
+@keyframes level6MetronomeTick {
+  0%   { transform: rotate(-22deg); }
+  50%  { transform: rotate(22deg); }
+  100% { transform: rotate(-22deg); }
+}
+
+/* 当前和弦指示 (在老师脚下显示 "Fa 上 + Do 下") */
+.level6-chord-indicator {
+  position: absolute;
+  top: 280px;
+  left: 540px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 18px;
+  background: rgba(253, 251, 245, 0.92);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18), inset 0 0 0 2px rgba(106, 76, 147, 0.25);
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-weight: 700;
+  color: #3d2b1a;
+  pointer-events: none;
+  transform-origin: center;
+}
+.level6-chord-indicator__label {
+  font-size: 11px;
+  color: #6a4c93;
+  background: rgba(106, 76, 147, 0.12);
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+.level6-chord-indicator__chord {
+  font-size: 16px;
+  color: #c0392b;
+  letter-spacing: 0.5px;
+}
+
+/* 键盘左右手分区色 — 加深, 让 LH/RH 一眼分明 */
+.level6-lh .key__shape {
+  fill: #b8e6c0 !important;
+  stroke: #2d8a3e !important;
+  stroke-width: 2 !important;
+}
+.level6-rh .key__shape {
+  fill: #ffe488 !important;
+  stroke: #b07000 !important;
+  stroke-width: 2 !important;
 }
 
 
@@ -2578,6 +3049,111 @@ button:active:not(:disabled),
 @keyframes birdFloat {
   0%, 100% { transform: translateX(0) translateY(0); }
   50%      { transform: translateX(8px) translateY(-6px); }
+}
+
+/* === Level 7 polish: 小鸟横飞 + 树屋点亮 + 鱼 lift-up + 飘带 === */
+
+/* 小鸟 — 4 只小鸟横穿场景, 错峰飞行 */
+.level7-bird--fly1 { animation: level7BirdFly1 12s linear infinite; }
+.level7-bird--fly2 { animation: level7BirdFly2 14s linear infinite; animation-delay: -3s; }
+.level7-bird--fly3 { animation: level7BirdFly3 11s linear infinite; animation-delay: -7s; }
+.level7-bird--fly4 { animation: level7BirdFly4 16s linear infinite; animation-delay: -5s; }
+@keyframes level7BirdFly1 {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { transform: translate(400px, -30px); opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translate(860px, -10px); opacity: 0; }
+}
+@keyframes level7BirdFly2 {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { transform: translate(380px, -50px); opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translate(860px, 10px); opacity: 0; }
+}
+@keyframes level7BirdFly3 {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  10%  { opacity: 1; }
+  50%  { transform: translate(420px, 20px); opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translate(860px, 30px); opacity: 0; }
+}
+@keyframes level7BirdFly4 {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  10%  { opacity: 1; }
+  50%  { transform: translate(400px, -10px); opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translate(860px, -40px); opacity: 0; }
+}
+
+/* 树屋点亮 (7/7 通关触发 .level7-lit 加在背景上) */
+.level7-treehouse-glow {
+  transition: opacity 0.8s ease-out, r 0.8s ease-out;
+}
+.level7-lit .level7-treehouse-glow {
+  opacity: 0.6 !important;
+  animation: level7TreehouseGlow 1.5s ease-in-out infinite;
+}
+@keyframes level7TreehouseGlow {
+  0%, 100% { opacity: 0.4; r: 22; }
+  50%      { opacity: 0.75; r: 32; }
+}
+.level7-lit .level7-leaves {
+  fill: #f4c430 !important;
+  animation: level7LeavesGold 1.5s ease-in-out infinite;
+}
+@keyframes level7LeavesGold {
+  0%, 100% { fill: #d4a017; }
+  50%      { fill: #fff3a8; }
+}
+
+/* 已完成的台阶 — 持续发光环 */
+.level7-step-complete circle:nth-child(2) {
+  fill: rgba(255, 248, 168, 0.6) !important;
+  animation: level7StepDone 2s ease-in-out infinite;
+}
+@keyframes level7StepDone {
+  0%, 100% { fill: rgba(255, 248, 168, 0.45); }
+  50%      { fill: rgba(255, 248, 168, 0.95); }
+}
+
+/* 单个台阶答对时短暂发光 (Sol/La/Si) */
+.level7-step-glow circle:nth-child(3) {
+  stroke: #ffd166 !important;
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 6px #ffd166);
+  animation: level7StepGlowPulse 1s ease-out;
+}
+@keyframes level7StepGlowPulse {
+  0%   { stroke-opacity: 1; }
+  100% { stroke-opacity: 0; }
+}
+
+/* 鱼 lift-up 动画 (高音台阶 Si/La/Sol 答对时) */
+.level7-fish-lift {
+  animation: level7FishLift 0.85s ease-out;
+  transform-origin: center;
+}
+@keyframes level7FishLift {
+  0%   { transform: rotate(-15deg) translateY(0); }
+  40%  { transform: rotate(-25deg) translateY(-12px); }
+  70%  { transform: rotate(-20deg) translateY(-4px); }
+  100% { transform: rotate(-15deg) translateY(0); }
+}
+
+/* 飘带层 — 由 JS 注入 SVG 路径 */
+.level7-ribbon-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.level7-ribbon-svg {
+  display: block;
+}
+.level7-ribbon-path {
+  filter: drop-shadow(0 0 4px currentColor);
 }
 
 /* === v18: Level 9 黑键世界 === */
@@ -3754,4 +4330,69 @@ button:active:not(:disabled),
   backdrop-filter: blur(6px);
   text-align: center;
   margin-top: -4px;
+}
+
+/* === v18: Themes === */
+
+/* Night 主题覆盖 */
+body[data-theme="night"] {
+  background: linear-gradient(180deg, #1a1430 0%, #251a3f 100%);
+}
+body[data-theme="night"] #app {
+  background: linear-gradient(180deg, #1a1430 0%, #3a1a40 60%, #4a1a30 100%);
+}
+body[data-theme="night"] .hud {
+  background: rgba(15, 10, 30, 0.85);
+  color: white;
+}
+body[data-theme="night"] .bubble {
+  background: #2a1a4a;
+  color: white;
+}
+body[data-theme="night"] .btn-primary {
+  background: rgba(255, 235, 168, 0.85);
+  color: #1a1430;
+}
+
+/* Forest 主题覆盖 */
+body[data-theme="forest"] {
+  background: linear-gradient(180deg, #1a3a2a 0%, #244a3a 100%);
+}
+body[data-theme="forest"] #app {
+  background: linear-gradient(180deg, #1a3a2a 0%, #2a5a3a 60%, #1a2a2a 100%);
+}
+body[data-theme="forest"] .hud {
+  background: rgba(10, 30, 20, 0.85);
+  color: white;
+}
+body[data-theme="forest"] .bubble {
+  background: #244a3a;
+  color: white;
+}
+body[data-theme="forest"] .btn-primary {
+  background: #84cc16;
+  color: #1a2a1a;
+}
+
+/* Theme switcher overlay (optional brief confirmation) */
+.theme-flash {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--warm-cta);
+  color: var(--staff-strong);
+  padding: 10px 24px;
+  border-radius: 24px;
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  z-index: 400;
+  animation: themeFlashIn 2s ease-out forwards;
+}
+@keyframes themeFlashIn {
+  0% { opacity: 0; transform: translate(-50%, 20px); }
+  20% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
 }

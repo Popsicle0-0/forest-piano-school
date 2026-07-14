@@ -3,6 +3,8 @@
  *
  * 深蓝→紫黑夜空渐变 + 大量闪烁小星星 + 3 颗旋转大星 + 弯月 + 远树剪影.
  * 自带背景渲染, 不接管 Audio. Game 控制 audio.
+ *
+ * v18.1: 加一位小小指挥家 (top-center, 摇摆动画) — 视觉引导, 提升演奏感.
  */
 import { SVG_NS } from '../utils/svg.js';
 
@@ -50,6 +52,35 @@ export class Level5Scene {
           </g>
           <g class="level5-star-big" transform="translate(550, 130)">
             <path d="M0,-10 L3,-3 L10,0 L3,3 L0,10 L-3,3 L-10,0 L-3,-3 Z" fill="#fff8a8" />
+          </g>
+        </g>
+
+        <!-- v18.1: 指挥家 (top-center) — 摇摆, 挥舞指挥棒 -->
+        <g class="level5-conductor" transform="translate(120, 18)">
+          <!-- 头 -->
+          <circle class="level5-conductor-head" cx="0" cy="0" r="10" fill="#ffd9a8" />
+          <!-- 礼帽 -->
+          <rect class="level5-conductor-hat" x="-9" y="-16" width="18" height="6" rx="1" fill="#1a1420" />
+          <rect class="level5-conductor-hat" x="-12" y="-11" width="24" height="2" fill="#1a1420" />
+          <!-- 笑脸 -->
+          <circle cx="-3" cy="-1" r="1.2" fill="#1a1420" />
+          <circle cx="3" cy="-1" r="1.2" fill="#1a1420" />
+          <path d="M-3,3 Q0,5 3,3" stroke="#1a1420" stroke-width="1" fill="none" stroke-linecap="round" />
+          <!-- 燕尾服身体 -->
+          <path class="level5-conductor-body"
+                d="M-7,10 L-10,28 L10,28 L7,10 Z"
+                fill="#1a1420" />
+          <!-- 白衬衫领 -->
+          <path d="M-2,10 L0,14 L2,10 Z" fill="#fff" />
+          <!-- 左手臂 + 指挥棒 -->
+          <g class="level5-conductor-arm-l">
+            <line x1="-7" y1="13" x2="-15" y2="6" stroke="#1a1420" stroke-width="2.5" stroke-linecap="round" />
+            <line x1="-15" y1="6" x2="-22" y2="0" stroke="#fff8a8" stroke-width="2" stroke-linecap="round" />
+          </g>
+          <!-- 右手臂 (挥舞) -->
+          <g class="level5-conductor-arm-r">
+            <line x1="7" y1="13" x2="15" y2="6" stroke="#1a1420" stroke-width="2.5" stroke-linecap="round" />
+            <line x1="15" y1="6" x2="22" y2="0" stroke="#fff8a8" stroke-width="2" stroke-linecap="round" />
           </g>
         </g>
 

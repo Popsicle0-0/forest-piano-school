@@ -6,6 +6,11 @@
  *   正确 = 泡泡放大消失 + 下一个音
  *   错音 = 泡泡变红闪烁 + 回放正确音 + 计数错
  *   漏敲 (泡泡掉完) = 计数错 + 换下个音
+ *
+ * v18.1 polish:
+ *   - 顶部节拍器 (♩=80 BPM, 后续音符可调)
+ *   - 进度推进时泡泡下落速度递减 (起步 4s → 末段 5.5s, 越打越宽)
+ *   - 连续 3 错 → 进入 easy mode: 节拍变慢 (60 BPM), hold 时长延长 0.4s
  */
 import { Level5Scene } from '../components/Level5Scene.js';
 import { PianoKeyboard } from '../components/PianoKeyboard.js';
@@ -23,6 +28,10 @@ const NOTE_INFO = {
 };
 
 const STAFF_TOP = 80;
+
+// 基础节拍 (BPM, ♩=) — normal / easy mode 两档
+const TEMPO_NORMAL = 80;
+const TEMPO_EASY = 60;
 
 export default function startLevel5(game) {
   if (typeof window !== 'undefined') {
@@ -53,6 +62,15 @@ export default function startLevel5(game) {
     </svg>
   `;
 
+  // v18.1: 节拍器 + 模式指示 (top-right, 浮在 staff 上方)
+  game.stage.insertAdjacentHTML('beforeend', `
+    <div class="level5-metronome" id="level5-metronome">
+      <span class="level5-metronome-note">♩=</span>
+      <span class="level5-metronome-bpm" id="level5-bpm">${TEMPO_NORMAL}</span>
+      <span class="level5-metronome-mode" id="level5-mode"></span>
+    </div>
+  `);
+
   // 钢琴键盘放在底部
   game.kb = new PianoKeyboard(game.stage, [
     { id: 'do',  solfege: 'Do',  pitch: 'C4', note: 'C', color: '#e63946' },
@@ -70,6 +88,8 @@ export default function startLevel5(game) {
   game._level5Idx = 0;
   game._level5Accepting = true;
   game._level5Done = false;
+  game._level5EasyMode = false;       // v18.1: easy mode flag
+  game._level5ConsecWrong = 0;        // v18.1: 连续错数, 达 3 进 easy mode
 
   // 音符在五线谱上的垂直位置 (cy, viewBox 坐标)
   const NOTE_Y = {
@@ -84,6 +104,38 @@ export default function startLevel5(game) {
 
   function getNoteEl() {
     return staffArea.querySelector('.level5-current-note');
+  }
+
+  function setTempo(bpm, modeLabel) {
+    const bpmEl = document.getElementById('level5-bpm');
+    const modeEl = document.getElementById('level5-mode');
+    if (bpmEl) bpmEl.textContent = String(bpm);
+    if (modeEl) modeEl.textContent = modeLabel || '';
+    const metronome = document.getElementById('level5-metronome');
+    if (metronome) {
+      metronome.classList.toggle('level5-metronome--easy', !!modeLabel);
+    }
+  }
+
+  // v18.1: 计算当前音符的下落时长 (越往后越慢, easy mode 再 +1.5s)
+  function computeFallDuration() {
+    const idx = game._level5Idx || 0;
+    const total = game._level5Total || 14;
+    const progress = Math.min(1, idx / Math.max(1, total - 1)); // 0..1
+    // 起步 4.0s, 末段 5.5s
+    const base = 4.0 + progress * 1.5;
+    // easy mode: 额外 +1.5s
+    return game._level5EasyMode ? base + 1.5 : base;
+  }
+
+  // v18.1: 检查是否进入 easy mode
+  function maybeEnterEasyMode() {
+    if (game._level5EasyMode) return;
+    if (game._level5ConsecWrong >= 3) {
+      game._level5EasyMode = true;
+      setTempo(TEMPO_EASY, '轻松模式');
+      try { game.say('进入轻松模式~ 慢慢来不着急!'); } catch (_) {}
+    }
   }
 
   function spawnNextNote() {
@@ -106,15 +158,18 @@ export default function startLevel5(game) {
 
     game._level5Accepting = true;
 
-    // 用 gsap 动画 - 4 秒缓慢下落到琴键位置
+    const duration = computeFallDuration();
+    // gsap 动画 — 缓慢下落
     gsap.fromTo(noteEl,
       { attr: { cy: staffY }, opacity: 1 },
-      { attr: { cy: staffY + 100 }, opacity: 0.9, duration: 4, ease: 'none',
+      { attr: { cy: staffY + 100 }, opacity: 0.9, duration, ease: 'none',
         onComplete: () => {
           // 漏敲 (泡泡掉完)
           if (!game._level5Done && game._level5Accepting) {
             game._level5Accepting = false;
             game.wrongCount++;
+            game._level5ConsecWrong++;
+            maybeEnterEasyMode();
             try { game.audio.wrong(); } catch (_) {}
             game.say('漏拍啦! 看下一个音符~');
             noteEl.classList.add('incorrect');
@@ -139,6 +194,7 @@ export default function startLevel5(game) {
       // 正确
       game._level5Correct++;
       game._level5Accepting = false;
+      game._level5ConsecWrong = 0;  // 重置连续错
       try { game.audio.correct(); } catch (_) {}
       try { game.audio.playNote(actualPitch); } catch (_) {}
 
@@ -166,6 +222,8 @@ export default function startLevel5(game) {
     } else {
       // 错音
       game.wrongCount++;
+      game._level5ConsecWrong++;
+      maybeEnterEasyMode();
       try { game.audio.wrong(); } catch (_) {}
       const actualInfo = NOTE_INFO[actualPitch];
       game.say(`这是 ${actualInfo ? actualInfo.solfege : '?'}, 不是 ${NOTE_INFO[expectedPitch].solfege}. 再听一下!`);
@@ -188,6 +246,8 @@ export default function startLevel5(game) {
     const noteEl = staffArea && staffArea.querySelector('.level5-current-note');
     if (noteEl) gsap.killTweensOf(noteEl);
     game.stage.querySelectorAll('.level5-staff-area').forEach((s) => s.remove());
+    const metronome = document.getElementById('level5-metronome');
+    if (metronome) metronome.remove();
     const hud2 = document.getElementById('hud-level2');
     if (hud2) hud2.style.display = '';
     const dots = document.querySelector('.hud__dots');

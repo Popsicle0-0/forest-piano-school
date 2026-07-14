@@ -1,0 +1,20 @@
+{
+  "name": "森林钢琴学校 - Forest Piano School",
+  "short_name": "森林钢琴",
+  "description": "5-10 岁孩子的钢琴启蒙互动游戏",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#FFF8EC",
+  "theme_color": "#3d405b",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

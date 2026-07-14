@@ -7,9 +7,15 @@
  *  - 7 条鱼 (Do Re Mi Fa Sol La Si) 散布在场景下半
  *  - 树屋周围有 7 级台阶 (Do 最低 → Si 最高, 螺旋上升)
  *  - 拖鱼到对应台阶上 (接近判定, 容差 30px)
- *  - 全部 7 条放对后: 通关, 弹奏 Do→Si 上行 + 通关庆祝
+ *  - 全部 7 条放对后: 通关, 弹奏 Do→Si 上行 + 通关庆祝 + 树屋点亮
  *
  * Fa 和 Si 是五声音阶之外的"新朋友", 让孩子接触完整七声音阶.
+ *
+ * 增强 (polish):
+ *  - 鱼飞向台阶时, Scene 画一条彩色飘带 (drawRibbon)
+ *  - Si (最高一级) 答对时, 鱼额外做一次 lift-up 倾斜动画 (向上游)
+ *  - 7/7 通关: Scene.lightTreehouse() 把整个树屋点亮 (圆窗发光 + 树冠变金)
+ *  - 高音 (Si/La/Sol) 台阶答对时, 给台阶一个"高飞" 的发光环
  */
 import { Level7Scene } from '../components/Level7Scene.js';
 import { FishPool } from '../components/FishPool.js';
@@ -32,6 +38,9 @@ const STEP_CIRCLE_R = 36;
 // 通关用的 7 音上下行
 const SCALE_UP   = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4'];
 const SCALE_DOWN = ['B4', 'A4', 'G4', 'F4', 'E4', 'D4', 'C4'];
+
+// 高音台阶 — 答对时加 lift-up / 发光环
+const HIGH_STEPS = new Set(['sol', 'la', 'si']);
 
 const ENCOURAGE = ['完美!', '真棒!', '不错哟!', '完整 7 音在聚集!'];
 
@@ -123,6 +132,14 @@ export default function startLevel7(game) {
       const dx = tx - fr.left - curLeft;
       const dy = ty - fr.top - curTop;
 
+      // 飘带颜色 — 鱼的颜色
+      const ribbonColor = (fishNote && fishNote.color) || '#ffd166';
+
+      // 画飘带 (鱼当前位置 → 台阶)
+      try {
+        game.scene.drawRibbon(best, { x: fx, y: fy }, { x: tx, y: ty }, ribbonColor);
+      } catch (_) {}
+
       gsap.to(fish, {
         x: dx,
         y: dy,
@@ -157,6 +174,20 @@ export default function startLevel7(game) {
           });
           // 鱼原地弹一下
           gsap.fromTo(fish, { scale: 0.85 }, { scale: 1.05, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out' });
+
+          // 高音台阶 (Sol/La/Si) — 额外做一次 lift-up 倾斜动画 (向上游)
+          if (HIGH_STEPS.has(best)) {
+            try {
+              const fishEl = fish;
+              fishEl.classList.add('level7-fish-lift');
+              // 0.8s 后自动去掉 class (动画结束)
+              setTimeout(() => {
+                try { fishEl.classList.remove('level7-fish-lift'); } catch (_) {}
+              }, 900);
+            } catch (_) {}
+            // 台阶加发光环 class
+            try { targetEl.classList.add('level7-step-glow'); } catch (_) {}
+          }
 
           // 推进引导
           const msg = (ENCOURAGE[Math.min(game._level7Count - 1, ENCOURAGE.length - 1)]
@@ -200,10 +231,12 @@ export default function startLevel7(game) {
     }
   };
 
-  // 7) 通关: 弹奏 7 音上下行
+  // 7) 通关: 弹奏 7 音上下行 + 树屋点亮
   function level7Win() {
     const stars = game._calcStars();
     try { game.progress.markLevelComplete(7, stars); } catch (_) {}
+    // 树屋点亮 (圆窗 + 树冠金光 + 7 级台阶全部发光)
+    try { game.scene.lightTreehouse(); } catch (_) {}
     // 上行
     try { game.audio.playScale(SCALE_UP); } catch (_) {}
     game.say('完整的 Do Re Mi Fa Sol La Si 上行! 太棒了~');

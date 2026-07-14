@@ -13,6 +13,11 @@
  *
  * 通关星数随难度放宽 (diff 2 容许更多错, diff 3 容许最多 10 错仍 1⭐).
  * 集齐 6 首演奏过 → 选曲界面右上角显示"全部演奏!"徽章 (localStorage).
+ *
+ * v18.1 polish:
+ *   - "🎼 正在演奏" 徽章随进度条播放
+ *   - 答对时动物观众 (🐰🐻🦌🦊) 举手 cheer (一次性 class 切换)
+ *   - 通关后加 "📸" 截图按钮 + "✅ 完成啦" 印章 (轻量提示, 不下载)
  */
 import { Level8Scene } from '../components/Level8Scene.js';
 import { PianoKeyboard } from '../components/PianoKeyboard.js';
@@ -110,6 +115,18 @@ export default function startLevel8(game) {
   game._level8Timeouts = [];
 
   let staffArea = null;
+  // v18.1: cheer 计时器, 防抖
+  let cheerTimer = null;
+  function cheerAudience() {
+    const audience = document.getElementById('level8-audience');
+    if (!audience) return;
+    audience.classList.remove('level8-cheer');
+    // force reflow 才能再次触发动画
+    void audience.getBoundingClientRect();
+    audience.classList.add('level8-cheer');
+    clearTimeout(cheerTimer);
+    cheerTimer = setTimeout(() => audience.classList.remove('level8-cheer'), 700);
+  }
 
   function buildStaffArea() {
     game.stage.insertAdjacentHTML('beforeend', '<div class="level8-staff-area"></div>');
@@ -131,10 +148,11 @@ export default function startLevel8(game) {
   }
 
   function startSong(song) {
-    // 选完曲后: 收起歌曲卡片, 显示现在播什么 + 难度 + 进度
+    // 选完曲后: 收起歌曲卡片, 显示 "🎼 正在演奏" 徽章 + 现在播什么 + 难度 + 进度
     if (songStage) {
       songStage.innerHTML = `
         <div class="level8-now-playing">
+          <div class="level8-playing-badge">🎼 正在演奏</div>
           <div class="level8-now-emoji">${song.emoji}</div>
           <div class="level8-now-text">演奏: <strong>${song.name}</strong></div>
           <div class="level8-difficulty-badge level8-diff-${song.difficulty}">难度 ${song.diff}</div>
@@ -231,6 +249,9 @@ export default function startLevel8(game) {
         if (prog) prog.textContent = `${game._level8Idx + 1} / ${game._level8Total}`;
       }
 
+      // v18.1: 动物观众 cheer
+      cheerAudience();
+
       // 鼓励语 (3 句轮换)
       const praises = ['完美!', '森林在听!', '真棒!'];
       game.say(praises[Math.min(game._level8Correct - 1, praises.length - 1)]);
@@ -296,6 +317,34 @@ export default function startLevel8(game) {
     setTimeout(() => {
       try { game.showWinOverlay(stars, 8); } catch (_) {}
     }, 1200);
+
+    // v18.1: "📸" 截图按钮 + "✅ 完成啦" 印章 (在 win-overlay 上叠加, 不影响 main overlay)
+    game.stage.insertAdjacentHTML('beforeend', `
+      <div class="level8-snapshot-panel">
+        <button class="level8-snapshot-btn" id="level8-snapshot-btn"
+                title="保存成就">📸</button>
+        <div class="level8-completed-stamp" id="level8-completed-stamp">
+          ✅ 完成啦!
+        </div>
+      </div>
+    `);
+    setTimeout(() => {
+      const stamp = document.getElementById('level8-completed-stamp');
+      if (stamp) stamp.classList.add('show');
+    }, 600);
+    const snapBtn = document.getElementById('level8-snapshot-btn');
+    if (snapBtn) {
+      snapBtn.onclick = () => {
+        snapBtn.classList.add('clicked');
+        const stamp = document.getElementById('level8-completed-stamp');
+        if (stamp) {
+          stamp.textContent = '🎉 成就已记录! 🎉';
+          stamp.classList.add('show');
+        }
+        try { game.say('🎉 成就已记录!'); } catch (_) {}
+        setTimeout(() => snapBtn.classList.remove('clicked'), 400);
+      };
+    }
   }
 
   // 5) 触发一次 resize, 让 main.js 的 applyPhoneLayout / applyTabletLayout 接管新 DOM
@@ -307,6 +356,7 @@ export default function startLevel8(game) {
       game._level8Timeouts.forEach((id) => clearTimeout(id));
       game._level8Timeouts = [];
     }
+    clearTimeout(cheerTimer);
 
     game._level8Song = null;
 
@@ -318,7 +368,7 @@ export default function startLevel8(game) {
 
     // 拆 Level 8 DOM 节点 (stage.innerHTML 也会被 Game.start 兜底清空)
     if (game.stage) {
-      game.stage.querySelectorAll('.level8-song-stage, .level8-staff-area').forEach((el) => el.remove());
+      game.stage.querySelectorAll('.level8-song-stage, .level8-staff-area, .level8-snapshot-panel').forEach((el) => el.remove());
     }
 
     // 复位 HUD (回到 Level 1 默认)

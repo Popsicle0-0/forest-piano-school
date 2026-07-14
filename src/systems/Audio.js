@@ -4,7 +4,9 @@
  * 设计:
  *  - 不依赖 Tone.js 任何主路径 (iOS PWA 上 PolySynth/Sampler 不稳定)
  *  - 所有声音都用 OscillatorNode + GainNode 直接合成
- *  - 钢琴音: 三角波基音 + 2 个正弦泛音 + ADSR 包络
+ *  - 钢琴音: 三角波基音 + 4 个正弦泛音 (×2, ×3, ×4, ×5) + ADSR 包络
+ *  - 50ms 高通鼓槌噪声瞬态 (hammer attack)
+ *  - 延迟式混响总线 (feedback delay, 给所有音加"大厅"感)
  *  - Salamander 真钢琴采样 (Tone.js) 在后台加载, 加载完可选叠加
  *
  * 关键 API (供 Game.js 调用):
@@ -23,6 +25,8 @@ export class Audio {
     this._masterGain = null;
     this._bus = null;              // Tone.js bus (后台 Salamander 用)
     this._realPianoLoaded = false;
+    this._reverbBus = null;         // 混响发送总线 (delay-based)
+    this._reverbDelay = null;
   }
 
   /**
@@ -50,6 +54,7 @@ export class Audio {
         this._masterGain = this._webAudio.createGain();
         this._masterGain.gain.value = 0.75;
         this._masterGain.connect(this._webAudio.destination);
+        this._setupReverb();
       }
     } catch (e) {
       console.warn('[Audio] 创建 AudioContext 失败:', e);
@@ -134,8 +139,38 @@ export class Audio {
   }
 
   /**
+   * 设置延迟式混响总线 (web audio 自反馈). 只在首次 createCtx 时调一次.
+   */
+  _setupReverb() {
+    if (!this._webAudio || this._reverbBus) return;
+    const ctx = this._webAudio;
+
+    // 主混响发送总线
+    this._reverbBus = ctx.createGain();
+    this._reverbBus.gain.value = 0.18;
+
+    // 主延迟 (250ms) + 自反馈 0.4, 形成"大厅"感
+    this._reverbDelay = ctx.createDelay(1.0);
+    this._reverbDelay.delayTime.value = 0.25;
+    const feedback = ctx.createGain();
+    feedback.gain.value = 0.4;
+    const wet = ctx.createGain();
+    wet.gain.value = 1.0;
+
+    // 反馈环路
+    this._reverbBus.connect(this._reverbDelay);
+    this._reverbDelay.connect(feedback);
+    feedback.connect(this._reverbDelay);   // 自反馈
+    feedback.connect(wet);
+    wet.connect(this._masterGain);
+  }
+
+  /**
    * 原生 Web Audio 钢琴音:
-   * 三角波基音 + 二次正弦泛音(15%) + 三次正弦泛音(5%) + ADSR
+   *  - 三角波基音 + 4 个正弦泛音 (×2, ×3, ×4, ×5)
+   *  - 50ms 高通过滤噪声鼓槌瞬态
+   *  - 20% 信号送混响总线
+   *  - ADSR 包络
    */
   _playNoteWebAudio(pitch) {
     if (!this._webAudio) return;
@@ -152,42 +187,84 @@ export class Audio {
     const freq = freqMap[pitch];
     if (!freq) return;
 
-    // 基音 (三角波, 钢琴主体音色)
+    // ─── 鼓槌噪声瞬态 (hammer strike, 50ms) ───────────────────────
+    const noiseBufferSize = Math.floor(ctx.sampleRate * 0.05);
+    const noiseBuffer = ctx.createBuffer(1, noiseBufferSize, ctx.sampleRate);
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseBufferSize; i++) {
+      noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseBufferSize);
+    }
+    const noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuffer;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.value = 1500;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.15;
+    noiseSrc.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this._masterGain);
+    noiseSrc.start(t);
+    noiseSrc.stop(t + 0.05);
+
+    // ─── 基音 + 4 泛音 ─────────────────────────────────────────────
     const osc1 = ctx.createOscillator();
     osc1.type = 'triangle';
     osc1.frequency.setValueAtTime(freq, t);
 
-    // 二次泛音 (正弦, 提亮)
     const osc2 = ctx.createOscillator();
     osc2.type = 'sine';
     osc2.frequency.setValueAtTime(freq * 2, t);
 
-    // 三次泛音 (正弦, 微弱, 模拟击锤)
     const osc3 = ctx.createOscillator();
     osc3.type = 'sine';
     osc3.frequency.setValueAtTime(freq * 3, t);
 
+    // 4 次泛音 (新增, 更弱的成分, 加强钢琴金属感)
+    const osc4 = ctx.createOscillator();
+    osc4.type = 'sine';
+    osc4.frequency.setValueAtTime(freq * 4, t);
+    // 5 次泛音 (新增, 极弱的音色细节)
+    const osc5 = ctx.createOscillator();
+    osc5.type = 'sine';
+    osc5.frequency.setValueAtTime(freq * 5, t);
+
     // ADSR 包络
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.0001, t);
-    env.gain.exponentialRampToValueAtTime(0.65, t + 0.01);    // attack (was 0.45)
-    env.gain.exponentialRampToValueAtTime(0.35, t + 0.15);    // decay (was 0.25)
-    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);     // release
+    env.gain.exponentialRampToValueAtTime(0.65, t + 0.01);    // attack
+    env.gain.exponentialRampToValueAtTime(0.35, t + 0.15);    // decay
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);    // release
 
     // 泛音量
     const g2 = ctx.createGain();
     g2.gain.value = 0.15;
     const g3 = ctx.createGain();
     g3.gain.value = 0.05;
+    const g4 = ctx.createGain();
+    g4.gain.value = 0.03;   // 4 次泛音更弱
+    const g5 = ctx.createGain();
+    g5.gain.value = 0.015;  // 5 次泛音更更弱
 
-    osc1.connect(env).connect(this._masterGain);
-    osc2.connect(g2).connect(env);
-    osc3.connect(g3).connect(env);
+    osc1.connect(env);
+    osc2.connect(g2); g2.connect(env);
+    osc3.connect(g3); g3.connect(env);
+    osc4.connect(g4); g4.connect(env);
+    osc5.connect(g5); g5.connect(env);
+    env.connect(this._masterGain);
+
+    // 20% 信号送混响总线
+    const sendGain = ctx.createGain();
+    sendGain.gain.value = 0.2;
+    env.connect(sendGain);
+    sendGain.connect(this._reverbBus);
 
     const stopT = t + 0.85;
     osc1.start(t); osc1.stop(stopT);
     osc2.start(t); osc2.stop(stopT);
     osc3.start(t); osc3.stop(stopT);
+    osc4.start(t); osc4.stop(stopT);
+    osc5.start(t); osc5.stop(stopT);
   }
 
   /**

@@ -4,6 +4,11 @@
  * 7 条鱼散布在场景下半 (Do, Re, Mi, Fa, Sol, La, Si), 但只有 3 条
  * 是 Do Mi Sol — 玩家找出这 3 条并拖到对应高度的山谷台阶.
  * 通关条件: 3 个山上都放了正确的鱼.
+ *
+ * 增强 (v17.x polish):
+ *  - Distractor (Re/Fa/La/Si) 拖到山 → 3 座山整体抖动 + 鱼被更狠弹回 + 强提示
+ *  - 答对时, 在山脚触发金色粒子绽放 (DOM sparkle 圈)
+ *  - 进度推进时, 场景切换 .level3-progress-N 触发日落渐变 (亮黄 → 暖橙 → 紫橙 → 星空)
  */
 import { Level3Scene } from '../components/Level3Scene.js';
 import { FishPool } from '../components/FishPool.js';
@@ -49,7 +54,7 @@ export default function startLevel3(game) {
   const btnReplay = document.getElementById('btn-replay');
   if (btnReplay) btnReplay.style.display = '';
 
-  // 渲染山谷场景 (SVG 背景 + 3 座音阶台)
+  // 渲染山谷场景 (SVG 背景 + 3 座音阶台 + 日落遮罩 + 粒子层)
   game.scene = new Level3Scene(game.stage);
   // Game.js _startLevel1 也设了 game.bg (Background 实例). 避免冲突, Level3 不创建 bg.
 
@@ -115,6 +120,9 @@ export default function startLevel3(game) {
       game._level3Count = placed.size;
       try { game.audio.correct(); } catch (_) {}
 
+      // 推进日落渐变 (progress-0 → progress-N)
+      try { game.scene.setProgress(placed.size); } catch (_) {}
+
       const targetEl = game.scene.background.querySelector(`[data-note="${best}"]`);
       const targetRect = targetEl.getBoundingClientRect();
       const poolRect = game.fishPool.root.getBoundingClientRect();
@@ -125,6 +133,9 @@ export default function startLevel3(game) {
       const curTop = parseFloat(fish.style.top) || 0;
       const dx = targetX - curLeft - fish.offsetWidth / 2;
       const dy = targetY - curTop - fish.offsetHeight / 2;
+
+      // 粒子绽放颜色 — 用该鱼的色
+      const bloomColor = (fishNote && fishNote.color) || '#ffd166';
 
       gsap.to(fish, {
         x: dx,
@@ -138,6 +149,11 @@ export default function startLevel3(game) {
           // 弹一次该音 + 反馈音
           try { game.audio.playNote(fishNote.pitch); } catch (_) {}
           try { game._floatScore(fx, fy, `${fishNote.solfege} ✓`); } catch (_) {}
+          // 在山脚触发金色粒子绽放 (DOM sparkle 圈)
+          try {
+            const tr = targetEl.getBoundingClientRect();
+            game.scene.bloomAt(tr.left + tr.width / 2, tr.bottom, bloomColor);
+          } catch (_) {}
           // 鱼摇摆庆祝
           gsap.to(fish, {
             rotation: '+=8',
@@ -176,17 +192,28 @@ export default function startLevel3(game) {
       const isDistractor = !TARGET_NOTES.has(id);
       if (isDistractor) {
         // Re / Fa / La / Si — 不是 Do Mi Sol 之一
-        game.say(`${fishNote.solfege} 不是 Do Mi Sol 里的音哦! 找红 Do、黄 Mi、蓝 Sol`);
+        // 强反馈: 3 座山一起抖动 + 把鱼"更狠"弹回去 (用强 elastic)
+        try { game.scene.shakePlatforms(); } catch (_) {}
+        game.say(`${fishNote.solfege} 不在 Do Mi Sol 里哦! 找红色 Do、黄色 Mi、蓝色 Sol 三座山~`);
+        // 加大反向距离: 让鱼弹得更远, 视觉上"被甩回去"
+        gsap.to(fish, {
+          x: 0,
+          y: 0,
+          duration: 0.9,
+          ease: 'elastic.out(1.2, 0.4)',
+        });
+        // 同时给鱼一个轻微旋转加重"被甩"感
+        gsap.fromTo(fish, { rotation: '+=15' }, { rotation: 0, duration: 0.4, ease: 'power2.out' });
       } else if (inRange) {
         // 正确的鱼, 但拖到了别的山
         const correct = NOTES_ALL.find((n) => n.id === best);
         game.say(`${fishNote.solfege} 应该去另一座山, 不是 ${correct ? correct.solfege : '那座'} 的位置~`);
+        gsap.to(fish, { x: 0, y: 0, duration: 0.55, ease: 'elastic.out(1, 0.5)' });
       } else {
         // 拖到空白
         game.say(`${fishNote.solfege} 应该去山上相应的高度哦~`);
+        gsap.to(fish, { x: 0, y: 0, duration: 0.55, ease: 'elastic.out(1, 0.5)' });
       }
-
-      gsap.to(fish, { x: 0, y: 0, duration: 0.55, ease: 'elastic.out(1, 0.5)' });
     }
   };
 

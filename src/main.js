@@ -8,11 +8,15 @@ import { BGM } from './systems/BGM.js';
 import { Progress } from './systems/Progress.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
 import { Tutorial } from './components/Tutorial.js';
+import { ThemeSwitcher, THEME_ICONS } from './components/ThemeSwitcher.js';
+
+// 主题切换器 (v18): 尽早实例化, 在首屏前应用已保存主题
+const theme = new ThemeSwitcher();
 
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.2';
+const APP_VERSION = 'v18.3';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -155,6 +159,27 @@ function boot() {
     btnHelp.addEventListener('click', () => {
       const tut = new Tutorial(document.body, { onDone: () => {} });
       tut.show();
+    });
+  }
+
+  // ====== v18: 🎨 主题切换按钮 (HUD 右上角, 动态插入) ======
+  if (!document.getElementById('btn-theme')) {
+    const btnTheme = document.createElement('button');
+    btnTheme.className = 'hud__btn';
+    btnTheme.id = 'btn-theme';
+    btnTheme.setAttribute('aria-label', '主题');
+    btnTheme.title = '主题';
+    btnTheme.textContent = THEME_ICONS[theme.current] || '🎨';
+    document.querySelector('.hud__right')?.appendChild(btnTheme);
+    btnTheme.addEventListener('click', () => {
+      const next = theme.cycle();
+      btnTheme.textContent = next.icon;
+      // 短暂提示当前主题
+      const flash = document.createElement('div');
+      flash.className = 'theme-flash';
+      flash.textContent = `${next.icon} ${next.name}`;
+      document.body.appendChild(flash);
+      setTimeout(() => flash.remove(), 2000);
     });
   }
 
