@@ -83,26 +83,8 @@ export class PianoKeyboard {
       `;
     });
 
-    // 2) 5 个黑键 (C-D, D-E, F-G, G-A, A-B 之间)
-    BLACK_KEYS.forEach((b) => {
-      const x = b.x - BLACK_W / 2;
-      const cx = b.x;
-      const d = blackKeyPath(x);
-      inner += `
-        <g class="key key--black" data-pitch="${b.pitch}" data-id="${b.id}" style="${TOUCH_NONE}">
-          <path class="key__shape" d="${d}"
-                fill="#2b2b3a" stroke="#0a0a15" stroke-width="0.6" stroke-linejoin="round"/>
-          <text class="key__label" x="${cx}" y="100" text-anchor="middle"
-                font-family="'ZCOOL KuaiLe', 'Baloo 2', sans-serif"
-                font-size="12" font-weight="800" fill="#fdf6e3"
-                style="pointer-events: none;">${b.note}</text>
-          <text class="key__label" x="${cx}" y="118" text-anchor="middle"
-                font-family="'ZCOOL KuaiLe', sans-serif"
-                font-size="10" font-weight="500" fill="#fdf6e3"
-                style="pointer-events: none;">${b.solfege}</text>
-        </g>
-      `;
-    });
+    // 2) 5 个黑键 (C-D, D-E, F-G, G-A, A-B 之间) — 已按用户反馈去掉黑键
+    // BLACK_KEYS.forEach((b) => { ... });  // 黑键渲染已禁用
 
     wrap.innerHTML = `
       <svg class="keyboard" xmlns="${SVG_NS}"

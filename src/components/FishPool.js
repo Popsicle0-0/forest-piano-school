@@ -107,12 +107,12 @@ export class FishPool {
     }
 
     // Poisson-disc-like: 每条新鱼至少 MIN_DIST 远离已放置的鱼
-    const padL = POOL_PAD_X;
-    const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
-    // Allow fish to overflow vertically — they appear "across the river"
-    const OVERFLOW = 30;        // 允许鱼超出 fish-pool 上下边界 (z-index 让它们浮在 staff/keyboard 之上)
-    const padT = -OVERFLOW;
-    const padB = rect.height + OVERFLOW - FISH_SLOT_H;
+    const OVERFLOW_X = 6;   // 允许鱼稍微越过左右边 (可选)
+    const OVERFLOW_Y = 0;   // 不允许鱼超过上下 (避免出画面)
+    const padL = POOL_PAD_X - OVERFLOW_X;
+    const padR = rect.width - POOL_PAD_X - FISH_SLOT_W + OVERFLOW_X;
+    const padT = OVERFLOW_Y;
+    const padB = rect.height - OVERFLOW_Y - FISH_SLOT_H;
     const MIN_DIST = 70;        // px, 鱼中心点之间的最小间距 (was 28 — force more separation)
     const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
     const MAX_TRIES_PER_FISH = 80;  // was 60 — give more chances
@@ -501,11 +501,12 @@ export class FishPool {
     // 1. 为每条鱼计算新随机位置,更新 originalLeft/originalTop
     const rect = this.pool.getBoundingClientRect();
     if (rect.width >= 2 && rect.height >= 2) {
-      const OVERFLOW = 30;
-      const padL = POOL_PAD_X;
-      const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
-      const padT = -OVERFLOW;
-      const padB = rect.height + OVERFLOW - FISH_SLOT_H;
+      const OVERFLOW_X = 6;   // 允许鱼稍微越过左右边 (可选)
+      const OVERFLOW_Y = 0;   // 不允许鱼超过上下 (避免出画面)
+      const padL = POOL_PAD_X - OVERFLOW_X;
+      const padR = rect.width - POOL_PAD_X - FISH_SLOT_W + OVERFLOW_X;
+      const padT = OVERFLOW_Y;
+      const padB = rect.height - OVERFLOW_Y - FISH_SLOT_H;
       const MIN_DIST = 70;
       const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
       const MAX_TRIES_PER_FISH = 80;

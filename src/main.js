@@ -7,7 +7,7 @@ import { Audio } from './systems/Audio.js';
 import { Progress } from './systems/Progress.js';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v17.4';
+const APP_VERSION = 'v17.5';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -181,16 +181,17 @@ function applyPhoneLayout() {
     }
   }
 
-  // 五线谱: 50% of stage (was 55% of remaining), 强制 min 140px
+  // 五线谱: 顺序分配, 给鱼留至少 80px (避免鱼出画面)
   const staff = document.querySelector('.staff-wrap');
   if (staff) {
-    const staffH = Math.max(140, Math.floor(stageH * 0.50));
+    const kbH = Math.max(95, Math.floor(stageH * 0.30));
+    const staffH = Math.max(120, stageH - kbH - 80); // 给鱼留 80
     staff.style.position = 'absolute';
     staff.style.top = '0';
     staff.style.left = '0';
     staff.style.right = '0';
     staff.style.height = staffH + 'px';
-    staff.style.minHeight = '140px';
+    staff.style.minHeight = staffH + 'px';
     staff.style.display = 'flex';
     staff.style.alignItems = 'center';
     staff.style.justifyContent = 'center';
@@ -204,12 +205,12 @@ function applyPhoneLayout() {
     }
   }
 
-  // 鱼池: 剩下的 (~20%), 至少 50
+  // 鱼池: 剩下的, 至少 80 (保证 FISH_SLOT_H=76 能完整容纳)
   const fishPool = document.querySelector('.fish-pool');
   if (fishPool) {
     const kbH = Math.max(95, Math.floor(stageH * 0.30));
-    const staffH = Math.max(140, Math.floor(stageH * 0.50));
-    const fishH = Math.max(50, stageH - kbH - staffH);
+    const staffH = Math.max(120, stageH - kbH - 80); // 给鱼留 80
+    const fishH = stageH - kbH - staffH;             // 一定是 ≥ 80
     fishPool.style.position = 'absolute';
     fishPool.style.bottom = kbH + 'px';
     fishPool.style.left = '0';

@@ -48,7 +48,7 @@ export class Audio {
       if (!this._webAudio) {
         this._webAudio = new Ctx();
         this._masterGain = this._webAudio.createGain();
-        this._masterGain.gain.value = 0.5;
+        this._masterGain.gain.value = 0.75;
         this._masterGain.connect(this._webAudio.destination);
       }
     } catch (e) {
@@ -90,7 +90,7 @@ export class Audio {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(523.25, t);  // C5
       gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.4, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.6, t + 0.01);
       gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
       osc.connect(gain).connect(this._masterGain);
       osc.start(t);
@@ -170,8 +170,8 @@ export class Audio {
     // ADSR 包络
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.0001, t);
-    env.gain.exponentialRampToValueAtTime(0.45, t + 0.01);    // attack
-    env.gain.exponentialRampToValueAtTime(0.25, t + 0.15);    // decay
+    env.gain.exponentialRampToValueAtTime(0.65, t + 0.01);    // attack (was 0.45)
+    env.gain.exponentialRampToValueAtTime(0.35, t + 0.15);    // decay (was 0.25)
     env.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);     // release
 
     // 泛音量
@@ -203,7 +203,7 @@ export class Audio {
    */
   correct() {
     if (!this.unlocked || this.muted) return;
-    this._sfxArpeggio([523.25, 659.25, 783.99, 1046.5], 0.18, 0.06, 'sine', 0.32);
+    this._sfxArpeggio([523.25, 659.25, 783.99, 1046.5], 0.18, 0.06, 'sine', 0.55);
   }
 
   /**
@@ -211,7 +211,7 @@ export class Audio {
    */
   wrong() {
     if (!this.unlocked || this.muted) return;
-    this._sfxSlide(320, 150, 0.35, 'triangle', 0.28);
+    this._sfxSlide(320, 150, 0.35, 'triangle', 0.45);
   }
 
   /**
@@ -224,7 +224,7 @@ export class Audio {
       setTimeout(() => this._playNoteWebAudio(pitch), i * 220);
     });
     // 末尾闪铃
-    setTimeout(() => this._sfxArpeggio([1046.5, 1567.98, 2093], 0.12, 0.08, 'sine', 0.3),
+    setTimeout(() => this._sfxArpeggio([1046.5, 1567.98, 2093], 0.12, 0.08, 'sine', 0.5),
       pitches.length * 220 + 200);
   }
 
@@ -235,7 +235,7 @@ export class Audio {
     this.muted = !this.muted;
     if (this._masterGain) {
       this._masterGain.gain.cancelScheduledValues(this._webAudio.currentTime);
-      this._masterGain.gain.linearRampToValueAtTime(this.muted ? 0 : 0.5, 0.05);
+      this._masterGain.gain.linearRampToValueAtTime(this.muted ? 0 : 0.75, 0.05);
     }
     return this.muted;
   }
@@ -286,14 +286,14 @@ export class Audio {
     osc.frequency.exponentialRampToValueAtTime(180, t + 0.12);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
     osc.connect(g).connect(this._masterGain);
     osc.start(t);
     osc.stop(t + 0.18);
   }
 
-  _sfxArpeggio(freqs, duration = 0.18, gap = 0.06, type = 'sine', peak = 0.3) {
+  _sfxArpeggio(freqs, duration = 0.18, gap = 0.06, type = 'sine', peak = 0.5) {
     if (!this._webAudio) return;
     this._resumeWebAudio();
     const ctx = this._webAudio;
@@ -313,7 +313,7 @@ export class Audio {
     });
   }
 
-  _sfxSlide(from = 320, to = 150, duration = 0.35, type = 'triangle', peak = 0.28) {
+  _sfxSlide(from = 320, to = 150, duration = 0.35, type = 'triangle', peak = 0.45) {
     if (!this._webAudio) return;
     this._resumeWebAudio();
     const ctx = this._webAudio;

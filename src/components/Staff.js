@@ -88,7 +88,7 @@ export class Staff {
       <svg class="staff" xmlns="${SVG_NS}" viewBox="0 0 ${W} ${H}"
            preserveAspectRatio="xMidYMid meet" aria-label="五线谱">
         <!-- 高音谱号 -->
-        <text class="staff__clef" x="105" y="140" dominant-baseline="middle">𝄞</text>
+        <text class="staff__clef" x="105" y="120" dominant-baseline="middle">𝄞</text>
 
         <!-- 5 条主线 -->
         ${lines}
