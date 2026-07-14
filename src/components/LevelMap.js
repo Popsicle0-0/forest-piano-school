@@ -16,6 +16,7 @@ export const LEVEL_META = [
   { id: 10, name: '八度之旅',       emoji: '🎹', desc: '听音 — 是低八度还是高八度?',  theme: '#1e3a5f' },
   { id: 11, name: '翻牌记忆',       emoji: '🎴', desc: '翻开两张牌找一样的朋友',      theme: '#d96e8a' },
   { id: 12, name: '番茄节奏',       emoji: '🥁', desc: '跟着摆杆切菜 — 命中节拍!',   theme: '#c0392b' },
+  { id: 13, name: '节奏大师',       emoji: '⏱️', desc: '跟随节拍器逐渐加速,敲准 30 拍', theme: '#8b4513' },
 ];
 
 export class LevelMap {

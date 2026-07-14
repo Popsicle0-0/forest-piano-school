@@ -21,6 +21,8 @@ import { FishPool } from '../components/FishPool.js';
 // v18: 成就系统
 import { AchievementSystem } from './Achievements.js';
 import { AchievementToast } from '../components/AchievementToast.js';
+// v18.4: 实时音频波形可视化
+import { Waveform } from '../components/Waveform.js';
 
 // v17.8+: 多关卡注册表. 自动扫描 src/systems/Level*.js, 每个文件 default 导出
 // 一个 (game) => teardownFn 的启动函数. Game.start({levelId}) 通过本表分发.
@@ -129,6 +131,11 @@ export class Game {
     this._lastActivityAt = 0;      // v16: 用户最后操作时间
     this._idleNudgeScheduled = false;
     this._hintTimer = null;
+
+    // v18.4: 实时音频波形可视化 (singleton, 始终运行)
+    this.waveform = new Waveform(this.stage);
+    this.waveform.init(this.audio);
+    this.waveform.show();
   }
 
   /**
@@ -198,6 +205,9 @@ export class Game {
    */
   _startLevel1() {
     this._showLevel2HUD(false);
+    // v18.5: 250ms tap debounce 状态重置
+    this._level1FirstTap = false;
+    this._lastTapTime = 0;
     this.say('点屏幕开始呀～');
 
     // 1) 渲染场景(不依赖音频,先让用户看到东西)
@@ -230,6 +240,13 @@ export class Game {
       }
     };
     this.fishPool.onTap = (fish) => {
+      // v18.5: 250ms 防抖 (iOS 触屏偶发双击同一鱼) — 第一次不挡
+      if (this._level1FirstTap) {
+        if (Date.now() - (this._lastTapTime || 0) < 250) return;
+      } else {
+        this._level1FirstTap = true;
+      }
+      this._lastTapTime = Date.now();
       this._markActivity();
       if (!this.hasTappedFish) {
         this.hasTappedFish = true;
@@ -273,11 +290,21 @@ export class Game {
     this._level2AnswerNote = null;
     this._level2Done = new Set();
     this.gate = true;
+    // 250ms 防抖状态 (iOS 触屏偶发双击)
+    this._level2FirstTap = false;
+    this._lastTapTime = 0;
 
     // 鱼点选 handler
     this.fishPool.onTap = (fish) => {
       this._markActivity();
       if (!fish) return;
+      // 250ms 防抖 (iOS 触屏偶发双击) — 第一次点击不阻挡
+      if (this._level2FirstTap) {
+        if (Date.now() - (this._lastTapTime || 0) < 250) return;
+      } else {
+        this._level2FirstTap = true;
+      }
+      this._lastTapTime = Date.now();
       const id = fish.dataset.id;
       if (!this._level2AnswerNote) return;   // 题还没出
       this._handleLevel2Answer(id, fish);
@@ -311,6 +338,14 @@ export class Game {
   // ============================================================
 
   _handleLevel2Answer(id, fish) {
+    // 250ms 防抖 (iOS 触屏偶发双击同一鱼) — 第一次不挡
+    if (this._level2FirstTap) {
+      if (Date.now() - (this._lastTapTime || 0) < 250) return;
+    } else {
+      this._level2FirstTap = true;
+    }
+    this._lastTapTime = Date.now();
+
     if (id === this._level2AnswerNote) {
       // 答对
       try { this.audio.correct(); } catch (_) {}

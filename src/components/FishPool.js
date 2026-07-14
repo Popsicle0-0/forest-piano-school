@@ -278,6 +278,10 @@ export class FishPool {
     const onPointerDown = (e) => {
       // v17: 已正确放置的鱼锁定, 不让再拖
       if (fish.locked) return;
+      // 防重复点击 (iOS 触屏偶发双击)
+      const now = Date.now();
+      if (now - (this._lastTapTime || 0) < 250) return;
+      this._lastTapTime = now;
       if (this._dragEnabled === false) return; // 关拖动时 (level 2) 直接忽略, 只允许 click/tap
       if (activePointer !== null) return; // 单鱼只接一个触点
       // 鼠标: 只接受左键
@@ -444,6 +448,10 @@ export class FishPool {
     // 同时绑 click 作为 iOS 兜底 (有些 PWA 只 fire click 不 fire pointerdown)
     el.addEventListener('click', (e) => {
       if (fish.locked) return;
+      // 防重复点击 (iOS 触屏偶发双击) — 同 pointerdown 共用一个时间戳
+      const now = Date.now();
+      if (now - (this._lastTapTime || 0) < 250) return;
+      this._lastTapTime = now;
       // iOS 单独 fire click 时 (PWA 偶尔), 这里补触发 onTap
       // Game.onTap 幂等 (playNote + GSAP scale 可重放), 双触发只是重播同一音, 可接受
       if (typeof this.onTap === 'function') {

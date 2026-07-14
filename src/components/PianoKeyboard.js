@@ -51,8 +51,24 @@ export class PianoKeyboard {
   constructor(root, notes) {
     /** @type {HTMLElement} */ this.root = root;
     /** @type {Array<{id:string,solfege:string,pitch:string,note:string,color:string}>} */ this.notes = notes;
-    /** @type {(keyEl: SVGElement) => void} */ this.onPress = null;
     /** @type {SVGSVGElement} */ this.svg = null;
+    this._rawOnPress = null;
+    this._lastKeyTapTime = 0; // iOS 防重复触发 (250ms 内同键重复忽略)
+    // onPress 暴露为带 250ms 防抖的 wrapper, 防止 iOS 触屏偶发双击
+    Object.defineProperty(this, 'onPress', {
+      configurable: true,
+      enumerable: true,
+      get: () => this._rawOnPress
+        ? (keyEl) => {
+            if (typeof this._rawOnPress !== 'function') return;
+            const now = Date.now();
+            if (now - this._lastKeyTapTime < 250) return;
+            this._lastKeyTapTime = now;
+            try { this._rawOnPress(keyEl); } catch (err) { console.warn(err); }
+          }
+        : null,
+      set: (fn) => { this._rawOnPress = fn; },
+    });
     this.render();
   }
 

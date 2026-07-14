@@ -27,6 +27,59 @@ export class Audio {
     this._realPianoLoaded = false;
     this._reverbBus = null;         // 混响发送总线 (delay-based)
     this._reverbDelay = null;
+    // v18: 跟踪所有活跃的 oscillator, 关卡切换时方便统一停止, 避免余音
+    this._activeOscillators = new Set();
+    this._activeSources = new Set();
+  }
+
+  /**
+   * v18: 跟踪一个 oscillator (level 切换或显式 stop() 时会被统一 stop)
+   * @param {OscillatorNode} osc
+   * @param {number} stopAt - Web Audio 时间线上的 stop 时间
+   */
+  _trackOsc(osc, stopAt) {
+    if (!osc) return;
+    this._activeOscillators.add(osc);
+    const cleanup = () => {
+      try { this._activeOscillators.delete(osc); } catch (_) {}
+    };
+    // onended fires when the oscillator is stopped (by schedule or by external stop())
+    osc.onended = cleanup;
+  }
+
+  /**
+   * v18: 跟踪一个 BufferSource (鼓槌噪声等) — 同样需要清理
+   * @param {AudioBufferSourceNode} src
+   */
+  _trackSource(src) {
+    if (!src) return;
+    this._activeSources.add(src);
+    src.onended = () => { try { this._activeSources.delete(src); } catch (_) {} };
+  }
+
+  /**
+   * v18: 立即停止所有正在响的 oscillator + 缓冲源.
+   * 关卡切换或显式 mute 时调用 — 比 setTimeout cleanup 更可靠, 杜绝余音.
+   */
+  stop() {
+    if (!this._webAudio) return;
+    const ctx = this._webAudio;
+    const now = ctx.currentTime;
+    // 1) 把所有 osc 在 now 立即 stop + 静音 (避免 click)
+    this._activeOscillators.forEach((osc) => {
+      try {
+        // 静音 gain, 再 stop, 避免切断瞬间爆音
+        osc.disconnect();
+      } catch (_) {}
+      try { osc.stop(now); } catch (_) { /* already stopped */ }
+    });
+    this._activeOscillators.clear();
+    // 2) 缓冲源 (鼓槌噪声) — 直接 stop
+    this._activeSources.forEach((src) => {
+      try { src.stop(now); } catch (_) {}
+      try { src.disconnect(); } catch (_) {}
+    });
+    this._activeSources.clear();
   }
 
   /**
@@ -206,6 +259,7 @@ export class Audio {
     noiseGain.connect(this._masterGain);
     noiseSrc.start(t);
     noiseSrc.stop(t + 0.05);
+    this._trackSource(noiseSrc);
 
     // ─── 基音 + 4 泛音 ─────────────────────────────────────────────
     const osc1 = ctx.createOscillator();
@@ -265,6 +319,12 @@ export class Audio {
     osc3.start(t); osc3.stop(stopT);
     osc4.start(t); osc4.stop(stopT);
     osc5.start(t); osc5.stop(stopT);
+    // v18: 跟踪活跃 osc, 关卡切换时 stop() 可一键静音
+    this._trackOsc(osc1, stopT);
+    this._trackOsc(osc2, stopT);
+    this._trackOsc(osc3, stopT);
+    this._trackOsc(osc4, stopT);
+    this._trackOsc(osc5, stopT);
   }
 
   /**
@@ -313,6 +373,10 @@ export class Audio {
     if (this._masterGain) {
       this._masterGain.gain.cancelScheduledValues(this._webAudio.currentTime);
       this._masterGain.gain.linearRampToValueAtTime(this.muted ? 0 : 0.75, 0.05);
+    }
+    // v18: 静音时立即停掉所有正在响的 osc, 避免长 envelope 余音
+    if (this.muted) {
+      try { this.stop(); } catch (_) {}
     }
     return this.muted;
   }
@@ -368,6 +432,7 @@ export class Audio {
     osc.connect(g).connect(this._masterGain);
     osc.start(t);
     osc.stop(t + 0.18);
+    this._trackOsc(osc, t + 0.18);
   }
 
   _sfxArpeggio(freqs, duration = 0.18, gap = 0.06, type = 'sine', peak = 0.5) {
@@ -387,6 +452,7 @@ export class Audio {
       osc.connect(g).connect(this._masterGain);
       osc.start(t0);
       osc.stop(t0 + duration + 0.05);
+      this._trackOsc(osc, t0 + duration + 0.05);
     });
   }
 
@@ -406,5 +472,6 @@ export class Audio {
     osc.connect(g).connect(this._masterGain);
     osc.start(t);
     osc.stop(t + duration + 0.05);
+    this._trackOsc(osc, t + duration + 0.05);
   }
 }

@@ -29,6 +29,27 @@ export class SettingsPanel {
         </div>
 
         <div class="settings-panel__section">
+          <div class="settings-panel__section-title">⚙️ 玩法偏好</div>
+          <label class="settings-toggle-row">
+            <span>动画效果</span>
+            <input type="checkbox" id="settings-animations" />
+          </label>
+          <label class="settings-toggle-row">
+            <span>BGM 背景音乐</span>
+            <input type="checkbox" id="settings-bgm" />
+          </label>
+          <label class="settings-toggle-row">
+            <span>大字体</span>
+            <input type="checkbox" id="settings-large-text" />
+          </label>
+        </div>
+
+        <div class="settings-panel__section">
+          <div class="settings-panel__section-title">📖 教程</div>
+          <button class="btn-primary" id="settings-tutorial">📖 重看教程</button>
+        </div>
+
+        <div class="settings-panel__section">
           <div class="settings-panel__section-title">📖 关于</div>
           <div class="settings-panel__about">
             <p><strong>森林钢琴学校</strong></p>
@@ -74,7 +95,47 @@ export class SettingsPanel {
         }
       }
     });
+
+    const animToggle = wrap.querySelector('#settings-animations');
+    animToggle.checked = this._loadAnimationsPref();
+    animToggle.addEventListener('change', () => {
+      this._saveAnimationsPref(animToggle.checked);
+      document.body.classList.toggle('no-animations', !animToggle.checked);
+    });
+
+    const bgmToggle = wrap.querySelector('#settings-bgm');
+    bgmToggle.checked = this._loadBgmPref();
+    bgmToggle.addEventListener('change', () => {
+      this._saveBgmPref(bgmToggle.checked);
+      window.dispatchEvent(new CustomEvent('toggle-bgm'));
+    });
+
+    const bigText = wrap.querySelector('#settings-large-text');
+    bigText.checked = this._loadLargeTextPref();
+    bigText.addEventListener('change', () => {
+      this._saveLargeTextPref(bigText.checked);
+      document.body.classList.toggle('large-text', bigText.checked);
+    });
+
+    wrap.querySelector('#settings-tutorial').addEventListener('click', () => {
+      this.hide();
+      import('./Tutorial.js').then(({ Tutorial }) => {
+        const t = new Tutorial(document.body, { onDone: () => {} });
+        t.show();
+      });
+    });
   }
+
+  _loadAnimationsPref() {
+    try { return localStorage.getItem('forest-piano-animations') !== 'false'; } catch (_) { return true; }
+  }
+  _saveAnimationsPref(v) {
+    try { localStorage.setItem('forest-piano-animations', String(v)); } catch (_) {}
+  }
+  _loadBgmPref() { try { return localStorage.getItem('forest-piano-bgm') !== 'false'; } catch (_) { return true; } }
+  _saveBgmPref(v) { try { localStorage.setItem('forest-piano-bgm', String(v)); } catch (_) {} }
+  _loadLargeTextPref() { try { return localStorage.getItem('forest-piano-large-text') === 'true'; } catch (_) { return false; } }
+  _saveLargeTextPref(v) { try { localStorage.setItem('forest-piano-large-text', String(v)); } catch (_) {} }
 
   hide() {
     if (this.element && this.element.parentNode) {

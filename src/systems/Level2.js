@@ -79,12 +79,80 @@ export default function startLevel2(game) {
     }
   }
 
-  // 拦截原 _markLevel2FishCorrect — 原有逻辑 + 我们的视觉反馈 + idle hint 重置
+  // ============================================================
+  // 3.5) "跟读"模式 — 答对后: 大字唱名淡入 + Web Audio 合成的"唱名提示音"
+  //   用纯 Web Audio 合成一个简单的"sol-la-mi" 三音, 让人工智能"念"出唱名,
+  //   类似 TTS, 但不依赖任何外部资源. 配合大字 + 1s 后淡出, 强化记忆.
+  // ============================================================
+  function showBigSolfege(solfege, color) {
+    const big = document.createElement('div');
+    big.className = 'level2-big-solfege';
+    // 用 CSS 默认 warm-cta; 允许通过自定义变量覆盖 (兼容旧逻辑)
+    if (color) big.style.setProperty('--big-solfege-color', color);
+    big.textContent = solfege;
+    stage.appendChild(big);
+    // 后台脉冲 — 给整个 stage 一点暖色脉冲, 强化
+    stage.classList.add('level2-bg-pulse');
+    // v18.5: CSS 动画 1.4s 内完成 pop + fade, 1.5s 后移除 DOM
+    setTimeout(() => {
+      stage.classList.remove('level2-bg-pulse');
+      try { big.remove(); } catch (_) {}
+    }, 1500);
+  }
+
+  /**
+   * 合成"唱名提示音" — 每个唱名对应一个独特的三音旋律:
+   *   低八度根音 — 根音 — 纯五度 (类似 TTS 但纯合成, 避开 iOS SpeechSynthesis 不可用)
+   * 例如 Do → C3 - C4 - G4. 让孩子"听到"唱名的音调轮廓.
+   */
+  const SOLFEGE_MELODIES = {
+    'Do':  [130.81, 261.63, 392.00],                    // C3 - C4 - G4
+    'Re':  [146.83, 293.66, 440.00],                    // D3 - D4 - A4
+    'Mi':  [164.81, 329.63, 493.88],                    // E3 - E4 - B4
+    'Fa':  [174.61, 349.23, 523.25],                    // F3 - F4 - C5
+    'Sol': [196.00, 392.00, 587.33],                    // G3 - G4 - D5
+    'La':  [220.00, 440.00, 659.25],                    // A3 - A4 - E5
+    'Si':  [246.94, 493.88, 739.99],                    // B3 - B4 - F#5
+  };
+
+  function playSolfegeMelody(solfege) {
+    const audio = game.audio;
+    if (!audio || !audio._webAudio || audio.muted) return;
+    const ctx = audio._webAudio;
+    try { audio._resumeWebAudio && audio._resumeWebAudio(); } catch (_) {}
+    const freqs = SOLFEGE_MELODIES[solfege] || SOLFEGE_MELODIES['Do'];
+    const start = ctx.currentTime + 0.05;
+    freqs.forEach((f, i) => {
+      const t0 = start + i * 0.13;  // 每个音 130ms 间隔
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, t0);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+      osc.connect(g).connect(audio._masterGain);
+      osc.start(t0);
+      osc.stop(t0 + 0.22);
+      if (typeof audio._trackOsc === 'function') audio._trackOsc(osc, t0 + 0.22);
+    });
+  }
+
+  // 拦截原 _markLevel2FishCorrect — 原有逻辑 + 我们的视觉反馈 + idle hint 重置 + 大字跟读
   const origMarkCorrect = game._markLevel2FishCorrect.bind(game);
   game._markLevel2FishCorrect = (fish) => {
     origMarkCorrect(fish);
     updateProgressDots();
     showCorrectFeedback(fish);
+    // v18: 跟读模式 — 大字唱名 + 旋律短句
+    const id = fish && fish.dataset ? fish.dataset.id : null;
+    if (id) {
+      const note = NOTES.find((n) => n.id === id);
+      if (note) {
+        showBigSolfege(note.solfege, note.color);
+        try { playSolfegeMelody(note.solfege); } catch (_) {}
+      }
+    }
     if (typeof resetIdleHint === 'function') resetIdleHint();
   };
 
