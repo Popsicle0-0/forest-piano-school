@@ -7,7 +7,7 @@ import { Audio } from './systems/Audio.js';
 import { Progress } from './systems/Progress.js';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v12';
+const APP_VERSION = 'v13';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -42,15 +42,31 @@ function boot() {
   applyPhoneLayout();
   window.addEventListener('resize', applyPhoneLayout);
   window.addEventListener('orientationchange', () => {
-    // iOS Safari 旋转后延迟再算
     setTimeout(applyPhoneLayout, 100);
     setTimeout(applyPhoneLayout, 400);
   });
-  // 兜底: 启动后 500ms 再算一次, 因为 Game 是异步 mount
   setTimeout(applyPhoneLayout, 500);
   setTimeout(applyPhoneLayout, 1500);
 
-  // 全局错误兜底(避免页面卡死)
+  // ====== 右上角按钮: 声音 / 主页 ======
+  const btnSound = document.getElementById('btn-sound');
+  const btnHome = document.getElementById('btn-home');
+  if (btnSound) {
+    btnSound.addEventListener('click', () => {
+      const muted = game.audio.toggleMute();
+      btnSound.textContent = muted ? '🔇' : '🔊';
+    });
+  }
+  if (btnHome) {
+    btnHome.addEventListener('click', () => {
+      // 重新开始 (回到开始遮罩)
+      if (confirm('确定要重新开始吗?')) {
+        location.reload();
+      }
+    });
+  }
+
+  // 全局错误兜底
   window.addEventListener('error', (e) => {
     console.error('[forest-piano] error:', e.error);
   });
@@ -63,18 +79,15 @@ function boot() {
 function applyPhoneLayout() {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const isPhone = w <= 920;
+  // 只在手机上用 JS 强制布局; iPad (≥700) 用默认 CSS grid
+  const isPhone = w <= 700;
   if (!isPhone) return;  // 桌面/iPad 走 CSS grid
 
   const isLandscape = w > h;
-  // 横屏: hud 32px, bubble 44px, 键盘强制 100px
-  // 竖屏: 不应该进入游戏, rotate-hint 处理
   if (!isLandscape) return;
 
   const hudH = 32;
   const bubbleH = 44;
-  const stageTop = hudH;
-  const stageBottom = bubbleH;
   const stageH = h - hudH - bubbleH;
 
   // HUD
@@ -92,8 +105,8 @@ function applyPhoneLayout() {
   // 舞台
   if (stage) {
     stage.style.position = 'absolute';
-    stage.style.top = stageTop + 'px';
-    stage.style.bottom = stageBottom + 'px';
+    stage.style.top = hudH + 'px';
+    stage.style.bottom = bubbleH + 'px';
     stage.style.left = '0';
     stage.style.right = '0';
     stage.style.height = 'auto';
@@ -101,23 +114,22 @@ function applyPhoneLayout() {
     stage.style.overflow = 'hidden';
   }
 
-  // 键盘: 强制 100px 高度, 强制底部, 加亮黄色调试底
+  // 键盘: 38% 高度 (比之前 32% 大), 强制 min 110px
   const kb = document.querySelector('.keyboard-area');
   if (kb) {
-    const kbH = Math.max(100, Math.floor(stageH * 0.32));
+    const kbH = Math.max(110, Math.floor(stageH * 0.38));
     kb.style.position = 'absolute';
     kb.style.bottom = '0';
     kb.style.left = '0';
     kb.style.right = '0';
     kb.style.height = kbH + 'px';
-    kb.style.minHeight = '100px';
+    kb.style.minHeight = '110px';
     kb.style.width = '100%';
-    kb.style.background = 'rgba(255, 209, 102, 0.2)';  // 调试用: 黄色半透明
+    kb.style.background = 'rgba(255, 209, 102, 0.2)';
     kb.style.zIndex = '5';
     kb.style.display = 'flex';
     kb.style.alignItems = 'flex-end';
     kb.style.justifyContent = 'center';
-    // 强制 SVG 尺寸
     const svg = kb.querySelector('svg.keyboard');
     if (svg) {
       svg.style.width = '100%';
@@ -128,16 +140,18 @@ function applyPhoneLayout() {
     }
   }
 
-  // 五线谱: 在键盘上方
+  // 五线谱: 50% of (stage - keyboard), 强制 min 80px
   const staff = document.querySelector('.staff-wrap');
   if (staff) {
-    const staffH = Math.floor((stageH - 100) * 0.55);
+    const kbH = Math.max(110, Math.floor(stageH * 0.38));
+    const remaining = stageH - kbH;
+    const staffH = Math.max(80, Math.floor(remaining * 0.55));
     staff.style.position = 'absolute';
     staff.style.top = '0';
     staff.style.left = '0';
     staff.style.right = '0';
     staff.style.height = staffH + 'px';
-    staff.style.minHeight = '60px';
+    staff.style.minHeight = '80px';
     staff.style.display = 'flex';
     staff.style.alignItems = 'center';
     staff.style.justifyContent = 'center';
@@ -151,12 +165,12 @@ function applyPhoneLayout() {
     }
   }
 
-  // 鱼池: 在五线谱和键盘之间
+  // 鱼池: 中间
   const fishPool = document.querySelector('.fish-pool');
   if (fishPool) {
-    const kbH = Math.max(100, Math.floor(stageH * 0.32));
-    const staffH = Math.floor((stageH - 100) * 0.55);
-    const fishH = Math.max(50, stageH - kbH - staffH);
+    const kbH = Math.max(110, Math.floor(stageH * 0.38));
+    const staffH = Math.max(80, Math.floor((stageH - kbH) * 0.55));
+    const fishH = Math.max(60, stageH - kbH - staffH);
     fishPool.style.position = 'absolute';
     fishPool.style.bottom = kbH + 'px';
     fishPool.style.left = '0';

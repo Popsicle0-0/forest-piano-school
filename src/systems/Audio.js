@@ -40,11 +40,12 @@ export class Audio {
     // 1) Tone.js 主上下文 (必须在用户手势里同步触发)
     try { await Tone.start(); } catch (e) { console.warn('[Audio] Tone.start 失败:', e); }
 
-    // 2) 主总线 + 合成器 fallback
-    this._bus = new Tone.Gain(0.9).toDestination();
-    this._synth = new Tone.Synth({
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.18 },
+    // 2) 主总线 + 合成器 fallback (用 sine 更亮, iOS PWA 声音更响)
+    this._bus = new Tone.Gain(0.95).toDestination();
+    this._synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.005, decay: 0.15, sustain: 0.2, release: 0.4 },
+      volume: 0,  // 0 dB, 配合 bus 0.95 = 较响
     }).connect(this._bus);
     // 立刻把 piano 设为合成器, 这样 playNote 永远可用
     this.piano = this._synth;
@@ -115,6 +116,14 @@ export class Audio {
    */
   playNote(pitch) {
     if (!this.unlocked || this.muted) return;
+    // iOS PWA 防御: 每次 playNote 都尝试 resume 一下 web audio context
+    if (this._webAudio && this._webAudio.state === 'suspended') {
+      this._webAudio.resume().catch(() => {});
+    }
+    // Tone.js context 也强制 resume
+    if (Tone.context && Tone.context.state === 'suspended') {
+      Tone.context.resume().catch(() => {});
+    }
     try {
       this.piano.triggerAttackRelease(pitch, '8n');
     } catch (e) {
