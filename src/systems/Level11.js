@@ -26,6 +26,53 @@ const CARD_NOTES = [
   { id: 'fa', solfege: 'Fa',  pitch: 'F4', color: '#b5c99a', emoji: '🥝' },
 ];
 
+// v18.6 polish: 配对成功 "ping" 高频闪铃
+function playPing(audio) {
+  try {
+    const ctx = audio._webAudio;
+    if (!ctx || !audio.unlocked) return;
+    const t = ctx.currentTime;
+    // 双音闪铃 (高 8 度 + 高 5 度)
+    const tones = [
+      { f: 1567.98, delay: 0,    dur: 0.32, peak: 0.45 },
+      { f: 2093.00, delay: 0.04, dur: 0.32, peak: 0.35 },
+    ];
+    tones.forEach(({ f, delay, dur, peak }) => {
+      const t0 = t + delay;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, t0);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peak, t0 + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g).connect(audio._masterGain);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.05);
+    });
+  } catch (_) {}
+}
+
+// v18.6 polish: 8 颗 sparkle 粒子从中心射出
+function emitMatchSparkles(container, x, y, color = '#ffd166') {
+  const N = 8;
+  for (let i = 0; i < N; i++) {
+    const angle = (i / N) * Math.PI * 2 + Math.random() * 0.4;
+    const dist = 60 + Math.random() * 30;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    const s = document.createElement('span');
+    s.className = 'level11-sparkle';
+    s.style.left = `${x}px`;
+    s.style.top = `${y}px`;
+    s.style.setProperty('--dx', `${dx}px`);
+    s.style.setProperty('--dy', `${dy}px`);
+    s.style.background = color;
+    container.appendChild(s);
+    setTimeout(() => s.remove(), 800);
+  }
+}
+
 // Fisher-Yates shuffle
 function shuffle(arr) {
   const a = arr.slice();
@@ -68,6 +115,14 @@ export default function startLevel11(game) {
     <div class="level11-timer">⏱ <span class="level11-time">0.0</span>s</div>
   `;
   root.appendChild(hud);
+
+  // 3.5) v18.6: 倒计时/超时警告条 (贴在 HUD 下方, 横跨屏幕)
+  //    阈值: 25s 起开始变黄, 40s+ 完全变红
+  const timeBarWrap = document.createElement('div');
+  timeBarWrap.className = 'level11-time-bar';
+  timeBarWrap.innerHTML = `<div class="level11-time-bar__fill" id="level11-time-fill"></div>`;
+  root.appendChild(timeBarWrap);
+  const timeFillEl = timeBarWrap.querySelector('#level11-time-fill');
 
   // 4) 卡片网格 (4 列 2 行 = 8 张, 4 对)
   const board = document.createElement('div');
@@ -114,12 +169,23 @@ export default function startLevel11(game) {
   game._level11Tried = 0;
   game._level11Timer = null;
 
-  // 7) 计时器
+  // 7) 计时器 — 同时更新时间数字和进度条 (≥25s 渐变黄, ≥40s 变红)
   const timeEl = hud.querySelector('.level11-time');
+  const TIME_WARN = 25;  // 起变黄
+  const TIME_DANGER = 40; // 全红
   game._level11Timer = setInterval(() => {
     if (!game._level11Start) return;
     const t = (Date.now() - game._level11Start) / 1000;
     timeEl.textContent = t.toFixed(1);
+    if (timeFillEl) {
+      // 用 t / TIME_DANGER 比例填充
+      const ratio = Math.min(1, t / TIME_DANGER);
+      timeFillEl.style.width = `${ratio * 100}%`;
+      // 颜色阶段
+      timeFillEl.classList.remove('warn', 'danger');
+      if (t >= TIME_DANGER) timeFillEl.classList.add('danger');
+      else if (t >= TIME_WARN) timeFillEl.classList.add('warn');
+    }
   }, 100);
 
   // 8) 翻牌逻辑
@@ -144,6 +210,8 @@ export default function startLevel11(game) {
           a.classList.add('matched');
           b.classList.add('matched');
           try { game.audio.correct(); } catch (_) {}
+          // v18.6: 配对成功 "ping" 高频闪铃
+          try { playPing(game.audio); } catch (_) {}
           try { game._flashScreen(); } catch (_) {}
           game._level11Matched++;
           hud.querySelector('.level11-done').textContent = String(game._level11Matched);
@@ -152,6 +220,17 @@ export default function startLevel11(game) {
           try {
             const r = a.getBoundingClientRect();
             game._floatScore(r.left + r.width / 2, r.top, `${a.dataset.id.toUpperCase()} ✓`);
+          } catch (_) {}
+          // v18.6: 8 颗 sparkle 从两张牌的中点射出
+          try {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            const cx = (ra.left + ra.width / 2 + rb.left + rb.width / 2) / 2;
+            const cy = (ra.top + ra.height / 2 + rb.top + rb.height / 2) / 2;
+            const board = root.querySelector('.level11-board');
+            const br = board.getBoundingClientRect();
+            const color = a.dataset.color || '#ffd166';
+            emitMatchSparkles(board, cx - br.left, cy - br.top, color);
           } catch (_) {}
           // 重置 + 检查通关
           setTimeout(() => {

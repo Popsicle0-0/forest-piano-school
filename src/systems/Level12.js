@@ -87,6 +87,13 @@ export default function startLevel12(game) {
       <!-- 计时刻度 (装饰) -->
       <text x="60" y="200" class="level12-scale">Lento</text>
       <text x="240" y="200" class="level12-scale" text-anchor="end">Allegro</text>
+      <!-- v18.6 polish: perfect zone — 中线附近的窄带 (绿色高亮表示 PERFECT 容忍) -->
+      <rect x="142" y="78" width="16" height="240" rx="4"
+            fill="rgba(6, 214, 160, 0.18)"
+            stroke="rgba(6, 214, 160, 0.55)"
+            stroke-width="1.5"
+            stroke-dasharray="4 3"
+            class="level12-perfect-zone" />
     </svg>
     <!-- 中线指示 (竖直) -->
     <div class="level12-centerline"></div>
@@ -104,6 +111,15 @@ export default function startLevel12(game) {
   `;
   root.appendChild(cut);
 
+  // 5.5) v18.6 polish: combo 显示 — 嵌在 cut 按钮上方, combo ≥ 2 才出现
+  const comboEl = document.createElement('div');
+  comboEl.className = 'level12-combo';
+  comboEl.id = 'level12-combo';
+  comboEl.hidden = true;
+  comboEl.innerHTML = `<span class="level12-combo__num">0</span><span class="level12-combo__x">x combo</span>`;
+  root.appendChild(comboEl);
+  const comboNumEl = comboEl.querySelector('.level12-combo__num');
+
   // 6) 鼓励语
   const msg = document.createElement('div');
   msg.className = 'level12-message';
@@ -119,6 +135,16 @@ export default function startLevel12(game) {
   game._level12Running = false;
   game._level12Tween = null;
   game._level12Done = false;
+  game._level12Combo = 0;           // v18.6: 连击数
+  game._level12BestCombo = 0;
+  game._level12Score = 0;           // v18.6: 带乘子的总分
+  // v18.6: BPM -> 命中得分乘子 (60→1.0, 140→2.0)
+  function tempoMultiplier(bpm) {
+    const base = 60, max = 140, peak = 2.0;
+    if (bpm <= base) return 1.0;
+    if (bpm >= max) return peak;
+    return 1.0 + ((bpm - base) / (max - base)) * (peak - 1.0);
+  }
 
   const hitsEl  = hud.querySelector('.level12-hits');
   const bpmEl   = hud.querySelector('.level12-bpm');
@@ -193,6 +219,17 @@ export default function startLevel12(game) {
       try { game.audio.wrong(); } catch (_) {}
       msg.textContent = ['差一点!', '再稳点~', '跟住摆杆!'][Math.floor(Math.random() * 3)];
       gsap.fromTo(cut, { x: 0 }, { x: 8, duration: 0.06, yoyo: true, repeat: 5 });
+      // v18.6: combo 断
+      if (game._level12Combo >= 2) {
+        try {
+          game._floatScore(window.innerWidth / 2, window.innerHeight * 0.45,
+            `断啦 💔 (最佳 x${game._level12BestCombo})`);
+        } catch (_) {}
+      }
+      game._level12Combo = 0;
+      comboEl.hidden = true;
+      comboEl.classList.remove('combo-flash');
+      cut.classList.remove('combo-glow');
     } else {
       game._level12Hits++;
       try { game.audio.correct(); } catch (_) {}
@@ -204,6 +241,33 @@ export default function startLevel12(game) {
           startPendulum(game._level12BPM);
         }
       } catch (_) {}
+      // v18.6: 加分 = 基础分 (perfect=10, good=5) × tempo 乘子 × combo 乘子
+      const baseScore = result === 'perfect' ? 10 : 5;
+      game._level12Combo++;
+      if (game._level12Combo > game._level12BestCombo) {
+        game._level12BestCombo = game._level12Combo;
+      }
+      const comboMult = 1 + Math.min(game._level12Combo - 1, 9) * 0.1;  // 1.0, 1.1, ... 1.9
+      const tempoMult = tempoMultiplier(game._level12BPM);
+      const earned = Math.round(baseScore * tempoMult * comboMult);
+      game._level12Score += earned;
+      // 飘字显示本次得分 (含乘子)
+      try {
+        const txt = comboMult > 1.0 || tempoMult > 1.05
+          ? `+${earned}  (x${tempoMult.toFixed(1)}×x${comboMult.toFixed(1)})`
+          : `+${earned}`;
+        game._floatScore(window.innerWidth / 2, window.innerHeight * 0.36, txt);
+      } catch (_) {}
+      // combo ≥ 2 显示连击器 + 让 cut 按钮发光
+      if (game._level12Combo >= 2) {
+        comboNumEl.textContent = String(game._level12Combo);
+        comboEl.hidden = false;
+        comboEl.classList.remove('combo-flash');
+        // eslint-disable-next-line no-unused-expressions
+        void comboEl.offsetWidth;
+        comboEl.classList.add('combo-flash');
+        cut.classList.add('combo-glow');
+      }
       msg.textContent = result === 'perfect' ? '完美! 🎯' : '不错! ✨';
       gsap.fromTo(cut, { scale: 1 }, { scale: 0.85, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.out' });
     }
@@ -259,8 +323,11 @@ export default function startLevel12(game) {
     try { game.audio.playScale(['C4', 'E4', 'G4', 'C5']); } catch (_) {}
     try { game._flashScreen(); } catch (_) {}
     try {
+      const comboTxt = game._level12BestCombo >= 2
+        ? ` 连击 x${game._level12BestCombo}`
+        : '';
       game._floatScore(window.innerWidth / 2, window.innerHeight * 0.45,
-        `🎵 命中 ${Math.round(acc * 100)}%!`);
+        `🎵 ${game._level12Score} 分 (命中 ${Math.round(acc * 100)}%)${comboTxt}`);
     } catch (_) {}
     game.say(`完美收尾! 命中 ${Math.round(acc * 100)}% — 你有节奏感! 🎵`);
     setTimeout(() => { try { game.showWinOverlay(stars, 12); } catch (_) {} }, 1300);

@@ -36,13 +36,14 @@ function injectStyles() {
     }
     /* v17.6: 浮动动画放在 wrapper (.fish) 上, 让 hit area 跟随视觉位置
        (原来放 inner, wrapper 不动, 鱼浮起时 hit 区比鱼低 12px → 触屏"模糊") */
+    /* v18.2: 把"小浮动"和"呼吸缩放"合并成单一 keyframe, 4s 一循环 */
     @keyframes fishFloat {
-      from { transform: translateY(0); }
-      to   { transform: translateY(-6px); }    /* was -12px — 缩小漂移,触屏更准 */
+      0%, 100% { transform: translateY(0)    scale(1.00); }
+      50%      { transform: translateY(-6px) scale(1.03); }
     }
     .fish.is-floating {
-      animation: fishFloat var(--fish-float-dur, 2.6s) ease-in-out
-                 var(--fish-float-delay, 0s) infinite alternate;
+      animation: fishFloat var(--fish-float-dur, 4s) ease-in-out
+                 var(--fish-float-delay, 0s) infinite;
     }
     .fish {
       will-change: transform;
@@ -204,7 +205,7 @@ export class FishPool {
 
       // 内层: 待机浮动 (CSS keyframes) + 静态旋转
       const rot = (Math.random() - 0.5) * 6; // ±3°
-      const dur = 2 + Math.random();          // 2-3s
+      const dur = 3.5 + Math.random() * 1.0;  // 3.5-4.5s (4s 呼吸缩放)
       const delay = -Math.random() * dur;     // 负 delay 错相位,避免同时浮
 
       // 动画在 wrapper 上 → 时长/相位变量也放 wrapper
@@ -296,6 +297,8 @@ export class FishPool {
 
       // 抬起 z-index + 暂停浮动 (但保留相位)
       el.classList.add('dragging');
+      // v18.2 polish: 按下瞬间给 .pressing (depress 视觉), 等真正移动时再换成 dragging 视觉
+      el.classList.add('pressing');
       fish.el.style.animationPlayState = 'paused';  // v17.6: 动画在 wrapper, 暂停 wrapper
 
       // 切到 fixed 跟手 (避开 offsetParent 抖动)
@@ -305,7 +308,7 @@ export class FishPool {
       el.style.right = 'auto';
       el.style.bottom = 'auto';
       el.style.margin = '0';
-      el.style.transform = 'scale(1.03)';  // v17.6: was 1.08 — 缩小放大, 让手指和鱼更贴
+      el.style.transform = '';  // 由 .pressing / .dragging CSS 接管 (避免 inline transform 覆盖 CSS class)
 
       if (typeof this.onDragStart === 'function') {
         try { this.onDragStart(el); } catch (err) { console.warn(err); }
@@ -317,7 +320,15 @@ export class FishPool {
       e.preventDefault();
       el.style.left = `${e.clientX - grabOffsetX}px`;
       el.style.top = `${e.clientY - grabOffsetY}px`;
-      totalMove = Math.max(totalMove, Math.hypot(e.clientX - downX, e.clientY - downY));
+      const dxm = e.clientX - downX;
+      const dym = e.clientY - downY;
+      const moved = Math.hypot(dxm, dym);
+      totalMove = Math.max(totalMove, moved);
+
+      // v18.2: 超过阈值后, 把 .pressing 切到 .dragging (从"按下去"变成"被拖着")
+      if (totalMove > this.TAP_THRESHOLD && el.classList.contains('pressing')) {
+        el.classList.remove('pressing');
+      }
 
       // ---- 找最近的 staff slot 用于位置提示 ----
       if (typeof this.onDragMove === 'function') {
@@ -352,6 +363,7 @@ export class FishPool {
       if (totalMove < this.TAP_THRESHOLD) {
         // 单击: 复位 + 触发 onTap, 不做 drop 判定
         el.classList.remove('dragging');
+        el.classList.remove('pressing');
         el.style.position = '';
         el.style.left = `${fish.originalLeft}px`;
         el.style.top = `${fish.originalTop}px`;
@@ -396,6 +408,7 @@ export class FishPool {
 
       // ---- 复位 (为 handleWrong 的 gsap.to({x:0,y:0}) 做准备) ----
       el.classList.remove('dragging');
+      el.classList.remove('pressing');
       el.style.position = '';        // 回 CSS .fish (absolute)
       el.style.left = `${fish.originalLeft}px`;
       el.style.top = `${fish.originalTop}px`;
@@ -409,6 +422,12 @@ export class FishPool {
       if (typeof this.onDragMove === 'function') {
         this._lastHoveredSlot = null;
         try { this.onDragMove(el, null); } catch (err) { console.warn(err); }
+      }
+
+      // v18.2 polish: 正确放置后, 在鱼池原位留个淡淡的"鱼影", 1.2s 后淡出
+      // (放在 onDrop 之前, 让 Game.js 后续的 gsap 鱼飞行不会盖到阴影)
+      if (accepted) {
+        this._spawnSourceShadow(fish);
       }
 
       if (typeof this.onDrop === 'function') {
@@ -447,6 +466,25 @@ export class FishPool {
     if (!fish) return;
     fish.locked = true;
     fish.el.classList.add('fish--locked');
+  }
+
+  /**
+   * v18.2 polish: 在鱼池原位生成一个"鱼影", 淡出后自动清理.
+   * @param {{originalLeft:number,originalTop:number,note:{color:string}}} fish
+   */
+  _spawnSourceShadow(fish) {
+    if (!this.pool) return;
+    const shadow = document.createElement('div');
+    shadow.className = 'fish-source-shadow';
+    // 鱼色传入 CSS 变量, 让 .fish-source-shadow 拿到对应色 (默认深蓝灰兜底)
+    const c = fish.note && fish.note.color ? fish.note.color : 'rgba(20,40,70,0.45)';
+    shadow.style.setProperty('--shadow-color', c);
+    shadow.style.left = `${fish.originalLeft + FISH_SLOT_W / 2}px`;
+    shadow.style.top = `${fish.originalTop + FISH_SLOT_H / 2}px`;
+    this.pool.appendChild(shadow);
+    setTimeout(() => {
+      try { shadow.remove(); } catch (_) {}
+    }, 1400);
   }
 
   /**

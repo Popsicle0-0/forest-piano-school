@@ -9,6 +9,8 @@ import { Progress } from './systems/Progress.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
 import { Tutorial } from './components/Tutorial.js';
 import { ThemeSwitcher, THEME_ICONS } from './components/ThemeSwitcher.js';
+import { KeyboardShortcuts } from './components/Keyboard.js';
+import { Streak } from './systems/Streak.js';
 
 // 主题切换器 (v18): 尽早实例化, 在首屏前应用已保存主题
 const theme = new ThemeSwitcher();
@@ -16,7 +18,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.3';
+const APP_VERSION = 'v18.4';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -51,6 +53,38 @@ function boot() {
 
   // 启动关卡 1
   game.start({ levelId: 1 });
+
+  // ====== v18.3: 每日登录 Streak ======
+  const streak = new Streak();
+  const checkInResult = streak.checkIn();
+
+  if (checkInResult.isNew && checkInResult.streak >= 3) {
+    // Show streak toast
+    setTimeout(() => {
+      const toast = document.createElement('div');
+      toast.className = 'streak-toast';
+      toast.innerHTML = `
+        <div class="streak-toast__icon">🔥</div>
+        <div class="streak-toast__body">
+          <div class="streak-toast__title">连续 ${checkInResult.streak} 天!</div>
+          <div class="streak-toast__hint">坚持就是胜利</div>
+        </div>
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 50);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 500);
+      }, 5500);
+    }, 3000);
+  }
+
+  // Add 🔥 streak badge to HUD (top)
+  const streakBadge = document.createElement('div');
+  streakBadge.className = 'streak-badge';
+  streakBadge.textContent = `🔥 ${checkInResult.streak}`;
+  streakBadge.title = `连续 ${checkInResult.streak} 天, 最长 ${streak.get().longest}`;
+  document.querySelector('.hud__left')?.appendChild(streakBadge);
 
   // ====== 关键: 移动端 JS 强制布局 ======
   // iOS PWA 上 CSS vh/percent 不可靠, 用 JS 直接给元素设 inline style
@@ -197,6 +231,48 @@ function boot() {
   // 全局错误兜底
   window.addEventListener('error', (e) => {
     console.error('[forest-piano] error:', e.error);
+  });
+
+  // Remove splash after a short delay
+  setTimeout(() => {
+    const splash = document.getElementById('splash');
+    if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+  }, 2200);
+
+  // ====== v18.4: 键盘快捷键 + 帮助提示 (无障碍 + 高级玩家) ======
+  const keyboard = new KeyboardShortcuts(game);
+  keyboard.enable();
+
+  // 显示快捷键提示 (一次性, 当用户首次按 ? 键时)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+      const overlay = document.createElement('div');
+      overlay.className = 'keyboard-help';
+      overlay.innerHTML = `
+      <div class="keyboard-help__card">
+        <h2>🎹 键盘快捷键</h2>
+        <ul>
+          <li><kbd>1-9</kbd> 启动对应关卡</li>
+          <li><kbd>Space</kbd> 鼓/切按钮 (L4/L12)</li>
+          <li><kbd>M</kbd> 静音切换</li>
+          <li><kbd>Enter</kbd> 开始游戏</li>
+          <li><kbd>Esc</kbd> 关闭弹窗</li>
+          <li><kbd>?</kbd> 显示此帮助</li>
+        </ul>
+        <button class="btn-primary" id="kb-help-close">关闭 (任意键)</button>
+      </div>
+    `;
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      overlay.querySelector('#kb-help-close').addEventListener('click', close);
+      setTimeout(() => {
+        const handler = () => {
+          close();
+          document.removeEventListener('keydown', handler);
+        };
+        document.addEventListener('keydown', handler);
+      }, 100);
+    }
   });
 }
 

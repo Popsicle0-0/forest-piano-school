@@ -159,6 +159,7 @@ export class Staff {
   /**
    * 把"鱼正被拖着去对应位置"的 slot 高亮成 .targeting。
    * 同时只允许一个 slot 处于此状态;已 filled 的 slot 跳过。
+   * v18.2: 给左右相邻的 slot 加 .targeting-adjacent (弱脉冲, 暗示"也可以扔这里")
    * @param {string|null} id 鱼 ID, null 表示清空
    */
   setTarget(id) {
@@ -167,12 +168,29 @@ export class Staff {
     const slot = this.slots.get(id);
     if (!slot || this.filled.has(id)) return;
     slot.classList.add('targeting');
+
+    // 相邻 slot: 按 notes 数组顺序找左右邻居 (只在未 filled 时加 .targeting-adjacent)
+    const idx = this.notes.findIndex((n) => n.id === id);
+    if (idx > 0) {
+      const leftId = this.notes[idx - 1].id;
+      const leftSlot = this.slots.get(leftId);
+      if (leftSlot && !this.filled.has(leftId)) {
+        leftSlot.classList.add('targeting-adjacent');
+      }
+    }
+    if (idx >= 0 && idx < this.notes.length - 1) {
+      const rightId = this.notes[idx + 1].id;
+      const rightSlot = this.slots.get(rightId);
+      if (rightSlot && !this.filled.has(rightId)) {
+        rightSlot.classList.add('targeting-adjacent');
+      }
+    }
   }
 
-  /** 清除所有 .targeting 高亮 (拖动结束时调用) */
+  /** 清除所有 .targeting / .targeting-adjacent 高亮 (拖动结束时调用) */
   clearTarget() {
-    this.svg.querySelectorAll('.staff-slot.targeting').forEach((s) => {
-      s.classList.remove('targeting');
+    this.svg.querySelectorAll('.staff-slot.targeting, .staff-slot.targeting-adjacent').forEach((s) => {
+      s.classList.remove('targeting', 'targeting-adjacent');
     });
   }
 
@@ -195,7 +213,7 @@ export class Staff {
   reset() {
     this.filled.clear();
     this.svg.querySelectorAll('.staff-slot').forEach((s) => {
-      s.classList.remove('filled', 'hint', 'targeting', 'filling');
+      s.classList.remove('filled', 'hint', 'targeting', 'targeting-adjacent', 'filling');
       const dot = s.querySelector('.staff__dot');
       if (dot) {
         dot.classList.add('empty');

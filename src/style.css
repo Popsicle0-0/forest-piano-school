@@ -217,6 +217,43 @@ body::before {
 .fish-pool .fish.dragging {
   cursor: grabbing;
   z-index: 1000;
+  transform: scale(1.05);
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.28));
+  transition: transform 120ms ease-out, filter 120ms ease-out;
+}
+
+/* v18.2 polish: 按下时下沉 (depress), 视觉提示"被按住".
+   用 .fish.dragging.pressing 选择器提权 (0,3,0) 压过 .fish-pool .fish.dragging (0,2,0) */
+.fish.pressing {
+  animation: none;
+  cursor: grabbing;
+  transition: transform 80ms ease-out, filter 80ms ease-out;
+}
+.fish.dragging.pressing {
+  transform: scale(0.94) translateY(2px);
+  filter: brightness(0.92);
+}
+
+/* 鱼飞走后, 鱼池里留个淡淡的"鱼影" ~1.2s 淡出 */
+.fish-source-shadow {
+  position: absolute;
+  width: 70px;
+  height: 44px;
+  border-radius: 50%;
+  /* JS 把鱼的色 (或 var(--fish-red) 形式) 传给 --shadow-color, 中央最浓, 自然淡到透明 */
+  background: radial-gradient(ellipse at center,
+              var(--shadow-color, rgba(20, 40, 70, 0.45)) 0%,
+              transparent 70%);
+  opacity: 0.55;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
+  animation: fishSourceShadowFade 1.2s ease-out forwards;
+}
+@keyframes fishSourceShadowFade {
+  0%   { opacity: 0;    transform: translate(-50%, -50%) scale(0.4); }
+  25%  { opacity: 0.55; transform: translate(-50%, -50%) scale(1.0); }
+  100% { opacity: 0;    transform: translate(-50%, -50%) scale(1.4); }
 }
 
 /* v17: 已正确放置的鱼 — 不可拖不可点, 视觉变淡 */
@@ -486,6 +523,26 @@ body::before {
 @keyframes slotLabelPulse {
   0%, 100% { opacity: 0.7; transform: scale(1); }
   50%      { opacity: 1; transform: scale(1.06); }
+}
+
+/* targeting-adjacent (targeting slot 旁边的槽位, 弱脉冲提示) */
+.staff-slot.targeting-adjacent .staff__dot {
+  animation: slotAdjacentPulse 1.0s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+.staff-slot.targeting-adjacent .staff__placeholder-ring {
+  animation: slotAdjacentRing 1.0s ease-in-out infinite;
+  stroke: rgba(255, 209, 102, 0.6);
+  stroke-width: 1.8;
+}
+@keyframes slotAdjacentPulse {
+  0%, 100% { transform: scale(1);    filter: brightness(1);    opacity: 0.95; }
+  50%      { transform: scale(1.15); filter: brightness(1.06); opacity: 1; }
+}
+@keyframes slotAdjacentRing {
+  0%, 100% { transform: scale(1);    opacity: 0.55; }
+  50%      { transform: scale(1.20); opacity: 0.85; }
 }
 
 /* filled 永久显示 */
@@ -1279,6 +1336,40 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   background: #ffd166;
   transform: scale(1.25);
   box-shadow: 0 0 10px rgba(255, 209, 102, 0.7);
+}
+
+/* v18.2: 视觉倒计时 3-2-1 — 新题目开始时弹出 */
+.level2-countdown {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  width: 96px;
+  height: 96px;
+  margin-left: -48px;
+  margin-top: -48px;
+  z-index: 28;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 30%,
+              #fff3c4 0%,
+              #ffd166 55%,
+              #ff9f1c 100%);
+  color: #1a1420;
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-weight: 900;
+  font-size: 56px;
+  line-height: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 30px rgba(255, 209, 102, 0.85), inset 0 -6px 0 rgba(0, 0, 0, 0.12);
+  animation: level2CountdownPop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes level2CountdownPop {
+  0%   { opacity: 0;    transform: scale(0.3); }
+  20%  { opacity: 1;    transform: scale(1.15); }
+  60%  { opacity: 1;    transform: scale(1.0); }
+  100% { opacity: 0;    transform: scale(1.4); }
 }
 
 /* 答对泡泡 */
@@ -3251,6 +3342,112 @@ button:active:not(:disabled),
   80% { transform: translateX(4px); }
 }
 
+/* v18.6 polish: 触点扩散环 (在 key 内, 从触摸点向外) */
+.level9-touch-ripple {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  border-radius: 50%;
+  border: 3px solid rgba(155, 93, 229, 0.85);
+  background: transparent;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 1;
+  transform: scale(0.2);
+  transition: transform 700ms cubic-bezier(0.2, 0.6, 0.2, 1),
+              opacity 700ms ease-out;
+  box-sizing: border-box;
+}
+.level9-touch-ripple.go {
+  transform: scale(5);
+  opacity: 0;
+}
+
+/* v18.6 polish: 连击计数器 (浮在 keys 容器上方, 居中) */
+.level9-combo-meter {
+  position: absolute;
+  top: -54px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg,
+    rgba(255, 209, 102, 0.95),
+    rgba(231, 111, 81, 0.95));
+  color: #3d2410;
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-weight: 900;
+  box-shadow: 0 4px 14px rgba(231, 111, 81, 0.45),
+              inset 0 -3px 6px rgba(231, 111, 81, 0.4);
+  white-space: nowrap;
+  z-index: 5;
+  pointer-events: none;
+}
+.level9-combo-meter__num {
+  font-size: 24px;
+  color: #fff8dc;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  font-family: 'Nunito', sans-serif;
+}
+.level9-combo-meter__x {
+  font-size: 14px;
+  opacity: 0.75;
+}
+.level9-combo-meter__label {
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.level9-combo-meter.bump {
+  animation: comboBump 360ms ease-out;
+}
+@keyframes comboBump {
+  0%   { transform: translateX(-50%) scale(1); }
+  35%  { transform: translateX(-50%) scale(1.22); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+
+/* v18.6 polish: 上飘的连击数字 */
+.level9-combo-float {
+  position: absolute;
+  transform: translate(-50%, 0);
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 38px;
+  font-weight: 900;
+  color: #ffd166;
+  text-shadow:
+    0 0 12px rgba(255, 209, 102, 0.9),
+    0 4px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 30;
+  animation: comboFloat 1.1s ease-out forwards;
+  white-space: nowrap;
+}
+@keyframes comboFloat {
+  0%   { opacity: 0; transform: translate(-50%, 20px) scale(0.6); }
+  20%  { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+  60%  { opacity: 1; transform: translate(-50%, -40px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -90px) scale(0.9); }
+}
+
+/* v18.6 polish: 背景心跳脉冲 — 120 BPM (每 0.5s 一次完整脉冲) */
+.level9-background.beat-pulse {
+  animation: level9BeatPulse 0.5s ease-in-out infinite;
+}
+@keyframes level9BeatPulse {
+  0%, 100% {
+    filter: brightness(1) saturate(1);
+  }
+  35% {
+    filter: brightness(1.18) saturate(1.25)
+            drop-shadow(0 0 18px rgba(155, 93, 229, 0.45));
+  }
+}
+
 /* === Level 9 entry in LevelMap (主题色) === */
 .level-map-tile[data-id="9"] {
   background: linear-gradient(135deg, #2a0a55, #1a0a3a);
@@ -3855,6 +4052,122 @@ button:active:not(:disabled),
 }
 .level10-replay:active { transform: translateY(2px); }
 
+/* v18.6 polish: 八度区外的"高音 / 低音"提示标签 (always visible) */
+.level10-hint-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 122px 0 132px;  /* 避开 HUD 和底部 keyboard */
+}
+.level10-hint-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-weight: 900;
+  letter-spacing: 2px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(15, 10, 30, 0.5);
+  backdrop-filter: blur(4px);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  font-size: 16px;
+  white-space: nowrap;
+  animation: hintLabelBob 2.6s ease-in-out infinite;
+}
+.level10-hint-label--high {
+  color: #b8e0ff;
+  border-color: rgba(184, 224, 255, 0.4);
+  text-shadow: 0 0 8px rgba(95, 168, 181, 0.6);
+}
+.level10-hint-label--low {
+  color: #ffd4a8;
+  border-color: rgba(255, 212, 168, 0.4);
+  text-shadow: 0 0 8px rgba(231, 111, 81, 0.55);
+  animation-delay: 1.3s;
+}
+.level10-hint-label__arrow {
+  font-size: 14px;
+  line-height: 1;
+}
+.level10-hint-label__text {
+  font-size: 16px;
+}
+@keyframes hintLabelBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+/* v18.6 polish: "听一次" 小按钮 — 叠在两区中间 (位于 fish-area 上方一点) */
+.level10-preview {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translate(0, calc(-50% - 70px));
+  background: rgba(255, 209, 102, 0.95);
+  color: #3d2410;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 18px;
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.3);
+  transition: transform 120ms;
+  z-index: 6;
+  letter-spacing: 1px;
+  -webkit-tap-highlight-color: transparent;
+}
+.level10-preview:active {
+  transform: translate(0, calc(-50% - 68px)) scale(0.96);
+}
+.level10-preview.flash {
+  animation: previewFlash 600ms ease-out;
+}
+@keyframes previewFlash {
+  0%   { box-shadow: 0 3px 0 rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.3); }
+  40%  { box-shadow: 0 3px 0 rgba(0,0,0,0.25), 0 0 20px 6px rgba(255, 209, 102, 0.85); }
+  100% { box-shadow: 0 3px 0 rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.3); }
+}
+
+/* v18.6 polish: streak (连击) 显示 — 嵌在 HUD 中 */
+.level10-streak {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffd166, #e76f51);
+  color: #fff8dc;
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-weight: 900;
+  box-shadow: 0 2px 8px rgba(231, 111, 81, 0.5);
+  letter-spacing: 1px;
+}
+.level10-streak__num {
+  font-size: 18px;
+  font-family: 'Nunito', sans-serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.level10-streak__x {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.level10-streak.streak-bump {
+  animation: streakBump 360ms ease-out;
+}
+@keyframes streakBump {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
 .level10-regions {
   display: flex;
   flex-direction: column;
@@ -4141,6 +4454,70 @@ button:active:not(:disabled),
   80% { transform: translateX(3px); }
 }
 
+/* v18.6 polish: 倒计时/超时警告条 (横跨屏幕, 贴在 HUD 下方) */
+.level11-time-bar {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(540px, 96%);
+  height: 6px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 3px;
+  overflow: hidden;
+  z-index: 6;
+  box-shadow: 0 1px 3px rgba(176, 64, 96, 0.15);
+}
+.level11-time-bar__fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #b5c99a, #d96e8a);
+  border-radius: 3px;
+  transition: width 100ms linear, background 300ms ease-out;
+}
+.level11-time-bar__fill.warn {
+  background: linear-gradient(90deg, #f4a261, #ffd166);
+}
+.level11-time-bar__fill.danger {
+  background: linear-gradient(90deg, #ff5252, #b04060);
+  animation: timeBarPulse 800ms ease-in-out infinite;
+}
+@keyframes timeBarPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* v18.6 polish: 配对成功的 sparkle 粒子 */
+.level11-sparkle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px currentColor;
+  animation: sparkleFly 800ms cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+}
+@keyframes sparkleFly {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  20%  { opacity: 1; transform: translate(calc(-50% + var(--dx, 0) * 0.4), calc(-50% + var(--dy, 0) * 0.4)) scale(1.3); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0)), calc(-50% + var(--dy, 0))) scale(0.5); }
+}
+
+/* v18.6 polish: 卡片 hover 抬起效果 (轻微 tilt + scale) */
+.level11-card:not(.matched):not(.flipped):hover {
+  transform: translateY(-3px) scale(1.04) rotate(-1.2deg);
+  filter: drop-shadow(0 8px 14px rgba(176, 64, 96, 0.35));
+}
+.level11-card:not(.matched):not(.flipped):nth-child(even):hover {
+  transform: translateY(-3px) scale(1.04) rotate(1.2deg);
+}
+.level11-card {
+  transition: transform 220ms var(--ease-bounce, cubic-bezier(0.34, 1.56, 0.64, 1)),
+              filter 220ms ease-out;
+}
+
 /* ============================================================
  * v18.5: Level 12 — 番茄节奏 (Tempo Challenge)
  * ============================================================ */
@@ -4332,6 +4709,67 @@ button:active:not(:disabled),
   margin-top: -4px;
 }
 
+/* v18.6 polish: perfect zone — 中线附近的窄带 (SVG 内嵌, 这里微调闪烁动画) */
+.level12-perfect-zone {
+  animation: perfectZonePulse 0.6s ease-in-out infinite;
+}
+@keyframes perfectZonePulse {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 1; }
+}
+
+/* v18.6 polish: combo 显示 — 嵌在 cut 按钮上方 */
+.level12-combo {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffd166, #ff5252);
+  color: #fff8dc;
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-weight: 900;
+  box-shadow: 0 4px 16px rgba(255, 82, 82, 0.55),
+              inset 0 -3px 6px rgba(192, 57, 43, 0.35);
+  white-space: nowrap;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+  z-index: 5;
+  pointer-events: none;
+  /* 叠在 cut 按钮上方 */
+  order: 9;  /* 后插入 cut 之后但视觉在上方 */
+}
+.level12-combo__num {
+  font-size: 24px;
+  font-family: 'Nunito', sans-serif;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+.level12-combo__x {
+  font-size: 14px;
+  opacity: 0.9;
+}
+.level12-combo.combo-flash {
+  animation: comboFlash 380ms ease-out;
+}
+@keyframes comboFlash {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.3); filter: brightness(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* v18.6 polish: cut 按钮在 combo 状态下的发光 */
+.level12-cut.combo-glow {
+  animation: cutComboGlow 600ms ease-in-out infinite alternate;
+  box-shadow:
+    0 8px 0 #8a3a1a,
+    0 0 28px 4px rgba(255, 209, 102, 0.85),
+    0 12px 22px rgba(0, 0, 0, 0.4);
+}
+@keyframes cutComboGlow {
+  0%   { box-shadow: 0 8px 0 #8a3a1a, 0 0 22px 2px rgba(255, 209, 102, 0.6), 0 12px 22px rgba(0,0,0,0.4); }
+  100% { box-shadow: 0 8px 0 #8a3a1a, 0 0 32px 6px rgba(255, 209, 102, 0.95), 0 12px 22px rgba(0,0,0,0.4); }
+}
+
 /* === v18: Themes === */
 
 /* Night 主题覆盖 */
@@ -4361,6 +4799,56 @@ body[data-theme="forest"] {
 body[data-theme="forest"] #app {
   background: linear-gradient(180deg, #1a3a2a 0%, #2a5a3a 60%, #1a2a2a 100%);
 }
+
+/* === v18.4: Keyboard shortcuts === */
+kbd {
+  display: inline-block;
+  background: var(--bg-paper);
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-bottom-width: 3px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: 'Nunito', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--staff-strong);
+  margin: 0 4px;
+}
+.keyboard-help {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  animation: fadeIn 200ms;
+}
+.keyboard-help__card {
+  background: var(--bg-cream);
+  padding: 24px 32px;
+  border-radius: var(--r-lg);
+  max-width: 480px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+.keyboard-help__card h2 {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 24px;
+  margin-bottom: 16px;
+  color: var(--staff-strong);
+}
+.keyboard-help__card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+  text-align: left;
+  font-size: 14px;
+  line-height: 2;
+  color: var(--text-main);
+}
+.keyboard-help__card ul li { padding: 4px 0; }
 body[data-theme="forest"] .hud {
   background: rgba(10, 30, 20, 0.85);
   color: white;
@@ -4395,4 +4883,123 @@ body[data-theme="forest"] .btn-primary {
   20% { opacity: 1; transform: translate(-50%, 0); }
   80% { opacity: 1; transform: translate(-50%, 0); }
   100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+
+/* === v18.3: Streak === */
+.streak-toast {
+  position: fixed;
+  bottom: 80px;
+  right: 16px;
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+  color: white;
+  border-radius: 16px;
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 8px 24px rgba(255, 107, 53, 0.4);
+  z-index: 300;
+  opacity: 0;
+  transform: translateX(120%);
+  transition: transform 400ms var(--ease-bounce), opacity 400ms;
+}
+.streak-toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+.streak-toast__icon {
+  font-size: 36px;
+  filter: drop-shadow(0 0 8px rgba(255, 200, 100, 0.7));
+}
+.streak-toast__title {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+}
+.streak-toast__hint {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.18), rgba(247, 147, 30, 0.18));
+  color: var(--staff-strong);
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 900;
+  border: 2px solid rgba(255, 107, 53, 0.35);
+}
+body[data-theme="night"] .streak-badge,
+body[data-theme="forest"] .streak-badge {
+  color: white;
+}
+
+/* === v18.3: Splash 启动屏 === */
+.splash {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #fff8ec 0%, #fde68a 50%, #ffc971 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: splashFadeOut 800ms ease-out 1500ms forwards;
+}
+@keyframes splashFadeOut {
+  to { opacity: 0; pointer-events: none; visibility: hidden; }
+}
+.splash__logo {
+  font-size: 96px;
+  line-height: 1;
+  margin-bottom: 16px;
+  animation: splashBounce 1.2s ease-out infinite;
+}
+@keyframes splashBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+.splash__title {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--staff-strong);
+  margin-bottom: 4px;
+}
+.splash__subtitle {
+  font-family: 'Nunito', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--staff-strong);
+  opacity: 0.7;
+  margin-bottom: 32px;
+}
+.splash__loading {
+  width: 240px;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.splash__loading-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--warm-cta), #ffd166);
+  border-radius: 4px;
+  animation: splashLoad 1.5s ease-in-out forwards;
+}
+@keyframes splashLoad {
+  0%   { width: 0%; }
+  50%  { width: 70%; }
+  100% { width: 100%; }
+}
+.splash__hint {
+  font-family: 'Nunito', sans-serif;
+  font-size: 13px;
+  color: var(--text-sub);
+  opacity: 0.7;
 }

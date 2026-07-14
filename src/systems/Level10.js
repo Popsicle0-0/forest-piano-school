@@ -170,15 +170,33 @@ export default function startLevel10(game) {
     '<div class="level10-stage"></div>');
   const stageRoot = game.stage.querySelector('.level10-stage');
 
-  // 3) HUD: 进度 + 当前题目
+  // 3) HUD: 进度 + 当前题目 + 连击
   const hud = document.createElement('div');
   hud.className = 'level10-hud';
   hud.innerHTML = `
     <div class="level10-progress">第 <span class="level10-done">0</span> / <span class="level10-total">8</span> 题</div>
     <div class="level10-question">🎧 听一听, 是低还是高?</div>
-    <button class="level10-replay" id="level10-replay">🔁 重听</button>
+    <div class="level10-streak" id="level10-streak" hidden>
+      <span class="level10-streak__num">0</span><span class="level10-streak__x">x</span>
+    </div>
   `;
   stageRoot.appendChild(hud);
+
+  // 3.5) 八度区外的"高音/低音"提示标签 (always visible)
+  //     位于 HIGH 区之上, LOW 区之下, 各有一个箭头指向对应区
+  const hintLabels = document.createElement('div');
+  hintLabels.className = 'level10-hint-labels';
+  hintLabels.innerHTML = `
+    <div class="level10-hint-label level10-hint-label--high">
+      <span class="level10-hint-label__arrow">▲</span>
+      <span class="level10-hint-label__text">高音</span>
+    </div>
+    <div class="level10-hint-label level10-hint-label--low">
+      <span class="level10-hint-label__text">低音</span>
+      <span class="level10-hint-label__arrow">▼</span>
+    </div>
+  `;
+  stageRoot.appendChild(hintLabels);
 
   // 4) 两块"八度区" (上 = 高, 下 = 低)
   const regions = document.createElement('div');
@@ -197,6 +215,14 @@ export default function startLevel10(game) {
     </button>
   `;
   stageRoot.appendChild(regions);
+
+  // 4.5) "听一次" 小按钮 — 重播题目 (放在两区中间, 不抢眼)
+  const previewBtn = document.createElement('button');
+  previewBtn.className = 'level10-preview';
+  previewBtn.id = 'level10-preview';
+  previewBtn.innerHTML = '🔁 听一次';
+  previewBtn.title = '再听一次';
+  stageRoot.appendChild(previewBtn);
 
   // 5) 底部"参考键盘" — 两排迷你键 (上面标 HIGH, 下面 LOW)
   const kb = document.createElement('div');
@@ -220,6 +246,8 @@ export default function startLevel10(game) {
   game._level10Answering = false;
   game._level10Wrong = 0;
   game._level10Timestamps = [];
+  game._level10Streak = 0;         // v18.6: 连续正确 streak
+  game._level10BestStreak = 0;
 
   // 7) 高亮对应区域的"目标琴键"
   function highlightKey(isHigh, pitch) {
@@ -284,6 +312,11 @@ export default function startLevel10(game) {
     if (correct) {
       game._level10Done++;
       try { game.audio.correct(); } catch (_) {}
+      // streak
+      game._level10Streak++;
+      if (game._level10Streak > game._level10BestStreak) {
+        game._level10BestStreak = game._level10Streak;
+      }
       // 鱼飞进选中区
       const fr = fish.getBoundingClientRect();
       const rr = regionEl.getBoundingClientRect();
@@ -303,6 +336,24 @@ export default function startLevel10(game) {
         },
       });
 
+      // 飘字 (streak ≥ 2 显示)
+      if (game._level10Streak >= 2) {
+        try {
+          const text = `x${game._level10Streak}${game._level10Streak >= 5 ? ' 🔥' : ''}`;
+          game._floatScore(window.innerWidth / 2, window.innerHeight * 0.32, text);
+        } catch (_) {}
+      }
+
+      // streak HUD 更新
+      if (game._level10Streak >= 2) {
+        streakNumEl.textContent = String(game._level10Streak);
+        streakEl.hidden = false;
+        streakEl.classList.remove('streak-bump');
+        // eslint-disable-next-line no-unused-expressions
+        void streakEl.offsetWidth;
+        streakEl.classList.add('streak-bump');
+      }
+
       setTimeout(() => nextQuestion(), 1500);
     } else {
       game.wrongCount++;
@@ -314,6 +365,16 @@ export default function startLevel10(game) {
       gsap.to(fish, { rotation: 0, duration: 0.3 });
       const hint = cur.isHigh ? '高' : '低';
       game.say(`不对哟~ 这是${hint}八度 ${cur.solfege}, 再听一次?`);
+      // streak 断
+      if (game._level10Streak >= 2) {
+        try {
+          game._floatScore(window.innerWidth / 2, window.innerHeight * 0.32,
+            `断啦 💔 (最佳 x${game._level10BestStreak})`);
+        } catch (_) {}
+      }
+      game._level10Streak = 0;
+      streakEl.hidden = true;
+      streakEl.classList.remove('streak-bump');
       // 重播
       setTimeout(() => {
         playAt(game, cur.pitch, cur.isHigh);
@@ -330,12 +391,20 @@ export default function startLevel10(game) {
     });
   });
 
-  // 9) 重听按钮
-  const replayBtn = stageRoot.querySelector('#level10-replay');
-  replayBtn.addEventListener('click', () => {
+  // 9) "听一次" 按钮 (重播题目)
+  const previewEl = stageRoot.querySelector('#level10-preview');
+  const streakEl = stageRoot.querySelector('#level10-streak');
+  const streakNumEl = streakEl.querySelector('.level10-streak__num');
+  previewEl.addEventListener('click', () => {
     if (!game._level10Current) return;
     playAt(game, game._level10Current.pitch, game._level10Current.isHigh);
     game._level10Answering = true;
+    // 小闪一下按钮
+    previewEl.classList.remove('flash');
+    // eslint-disable-next-line no-unused-expressions
+    void previewEl.offsetWidth;
+    previewEl.classList.add('flash');
+    setTimeout(() => previewEl.classList.remove('flash'), 600);
   });
 
   // 10) 钢琴键可直接听音 (辅助)
@@ -362,7 +431,11 @@ export default function startLevel10(game) {
     try { game.audio.playScale(['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4']); } catch (_) {}
     try { game._flashScreen(); } catch (_) {}
     try {
-      game._floatScore(window.innerWidth / 2, window.innerHeight * 0.4, '🎵 八度完成! 🎵');
+      const bestTxt = game._level10BestStreak >= 2
+        ? ` (最佳连击 x${game._level10BestStreak})`
+        : '';
+      game._floatScore(window.innerWidth / 2, window.innerHeight * 0.4,
+        `🎵 八度完成!${bestTxt}`);
     } catch (_) {}
     game.say('八度都听出来了! 耳朵升级了~');
     setTimeout(() => { try { game.showWinOverlay(stars, 10); } catch (_) {} }, 1200);

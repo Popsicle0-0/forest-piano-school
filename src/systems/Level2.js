@@ -79,12 +79,13 @@ export default function startLevel2(game) {
     }
   }
 
-  // 拦截原 _markLevel2FishCorrect — 原有逻辑 + 我们的视觉反馈
+  // 拦截原 _markLevel2FishCorrect — 原有逻辑 + 我们的视觉反馈 + idle hint 重置
   const origMarkCorrect = game._markLevel2FishCorrect.bind(game);
   game._markLevel2FishCorrect = (fish) => {
     origMarkCorrect(fish);
     updateProgressDots();
     showCorrectFeedback(fish);
+    if (typeof resetIdleHint === 'function') resetIdleHint();
   };
 
   // ============================================================
@@ -120,10 +121,11 @@ export default function startLevel2(game) {
     osc3.frequency.setValueAtTime(freq * 3, t);
 
     // ADSR — attack 15ms, sustain 320ms, 长 release 2.2s, 让孩子听清
+    // v18.2: 重听时 envelope 峰值 1.0 (普通播放 ~0.5-0.7), 让重听明显更响
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.0001, t);
-    env.gain.exponentialRampToValueAtTime(0.95, t + 0.015);
-    env.gain.exponentialRampToValueAtTime(0.65, t + 0.35);
+    env.gain.exponentialRampToValueAtTime(1.0, t + 0.015);
+    env.gain.exponentialRampToValueAtTime(0.7, t + 0.35);
     env.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
 
     const g2 = ctx.createGain();
@@ -155,15 +157,21 @@ export default function startLevel2(game) {
       origReplay();
       return;
     }
-    // masterGain 临时拉满 (1.0), 2.4s 后线性回到原值
+    // v18.2: masterGain "ramp UP → play → ramp DOWN" 序列
+    //  - 60ms 从当前值线性升到 peakGain (1.0), 干净不爆音
+    //  - 2.5s 内线性回到 baseGain (0.75), 让 BGM 慢慢压回
+    //  配合 envelope 峰值 1.0 → 重听比正常播放 ~1.5x 响, 在 BGM 中也能听清
     const ctx = audio._webAudio;
     const gainNode = audio._masterGain;
     const now = ctx.currentTime;
     const baseGain = audio.muted ? 0 : 0.75;
+    const peakGain = audio.muted ? 0 : 1.0;
     try {
+      const cur = (typeof gainNode.gain.value === 'number') ? gainNode.gain.value : baseGain;
       gainNode.gain.cancelScheduledValues(now);
-      gainNode.gain.setValueAtTime(audio.muted ? 0 : 1.0, now);
-      gainNode.gain.linearRampToValueAtTime(baseGain, now + 2.4);
+      gainNode.gain.setValueAtTime(cur, now);
+      gainNode.gain.linearRampToValueAtTime(peakGain, now + 0.06);   // ramp UP (60ms)
+      gainNode.gain.linearRampToValueAtTime(baseGain, now + 2.5);    // ramp DOWN (2.5s)
     } catch (_) {}
     playLoudNote(note.pitch);
 
@@ -176,10 +184,74 @@ export default function startLevel2(game) {
     }
   };
 
+  // ============================================================
+  // 5) 视觉倒计时 3-2-1 — 新题目开始时, 金圈 + 数字 弹出 + 淡出
+  // ============================================================
+  function showCountdown() {
+    // 不在用户重听时弹倒计时 (只在题目切换时)
+    const seq = [3, 2, 1];
+    seq.forEach((num, i) => {
+      setTimeout(() => {
+        const dot = document.createElement('div');
+        dot.className = 'level2-countdown';
+        dot.textContent = String(num);
+        stage.appendChild(dot);
+        // 动画 700ms 后自动清理
+        setTimeout(() => { try { dot.remove(); } catch (_) {} }, 720);
+      }, i * 650);
+    });
+  }
+
+  // 拦截原 _level2NextQuestion, 在新题目开始时弹倒计时 (只在第一题后弹)
+  const origNextQuestion = game._level2NextQuestion.bind(game);
+  game._level2NextQuestion = () => {
+    const isFirst = !game._level2AnswerNote;
+    origNextQuestion();
+    // 第一题不弹倒计时 (题刚出, 立刻弹反而不友好), 第二题起每次都弹
+    if (!isFirst && game._level2AnswerNote) {
+      showCountdown();
+    }
+  };
+
+  // ============================================================
+  // 6) 10 秒不动 → 提示 "Select the fish that sang..."
+  // ============================================================
+  let idleHintTimer = null;
+  function scheduleIdleHint() {
+    if (idleHintTimer) clearTimeout(idleHintTimer);
+    idleHintTimer = setTimeout(() => {
+      // 仅在题目仍生效且还没答对时提示
+      if (game._level2AnswerNote && (game._level2Done || new Set()).size < (game._level2Total || 5)) {
+        try {
+          game.say('哪条小鱼刚才唱歌了? 点点它 🎵');
+        } catch (_) {}
+      }
+    }, 10000);
+  }
+  // 任何活动都重置: 重听 / 答错 / 答对 / 按键 → 重新计时
+  function resetIdleHint() { scheduleIdleHint(); }
+  const origReplayForIdle = game._replayQuestion;
+  game._replayQuestion = () => { try { origReplayForIdle(); } catch (_) {} resetIdleHint(); };
+
+  // 在标记答错时也重置 (原 _handleLevel2Answer 已重播, 我们只管计时)
+  // 由于不能改 Game.js, 我们 hook _handleLevel2Answer 让其重置 idle
+  if (typeof game._handleLevel2Answer === 'function') {
+    const origHandle = game._handleLevel2Answer.bind(game);
+    game._handleLevel2Answer = (id, fish) => {
+      try { origHandle(id, fish); } catch (_) {}
+      resetIdleHint();
+    };
+  }
+
+  // 启动首次计时 (下一题之后)
+  setTimeout(resetIdleHint, 1200);
+
   // 初始化进度点
   updateProgressDots();
 
   return () => {
+    if (idleHintTimer) { clearTimeout(idleHintTimer); idleHintTimer = null; }
+    // 清掉我们的 DOM
     if (typeof window !== 'undefined') {
       window.__forestPiano = window.__forestPiano || {};
       window.__forestPiano.currentLevelId = null;
@@ -196,6 +268,6 @@ export default function startLevel2(game) {
     if (prompt) prompt.remove();
     const prog = document.getElementById('level2-progress-dots');
     if (prog) prog.remove();
-    stage.querySelectorAll('.level2-correct-bubble, .level2-sparkle').forEach((el) => el.remove());
+    stage.querySelectorAll('.level2-correct-bubble, .level2-sparkle, .level2-countdown').forEach((el) => el.remove());
   };
 }
