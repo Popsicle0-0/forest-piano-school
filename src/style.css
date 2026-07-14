@@ -868,28 +868,49 @@ input, textarea, select { font-size: 16px; }
   100% { opacity: 0; }
 }
 
-/* +1 飘字 */
+/* +1 飘字 — v19: 更夸张 (更大 + 弹跳 + 星光轨迹 + 更久) */
 .score-float {
   position: fixed;
   transform: translate(-50%, -50%);
   font-family: 'ZCOOL KuaiLe', sans-serif;
-  font-size: 36px;
+  font-size: 44px;
   font-weight: 900;
   color: var(--warm-cta);
   text-shadow:
-    -1px -1px 0 white,
-    1px -1px 0 white,
-    -1px 1px 0 white,
-    1px 1px 0 white,
+    -2px -2px 0 white,
+    2px -2px 0 white,
+    -2px 2px 0 white,
+    2px 2px 0 white,
     0 4px 0 rgba(0, 0, 0, 0.18);
   pointer-events: none;
   z-index: 60;
-  animation: scoreRise 1.3s ease-out forwards;
+  animation: scoreRise 1.6s ease-out forwards;
+  white-space: nowrap;
 }
 @keyframes scoreRise {
   0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
-  30%  { transform: translate(-50%, -70%) scale(1.4); opacity: 1; }
-  100% { transform: translate(-50%, -180%) scale(1); opacity: 0; }
+  15%  { transform: translate(-50%, -60%) scale(1.6); opacity: 1; }
+  35%  { transform: translate(-50%, -70%) scale(1.0); opacity: 1; }
+  100% { transform: translate(-50%, -200%) scale(0.9); opacity: 0; }
+}
+.score-float::before {
+  /* 星光轨迹 via pseudo */
+  content: '✦ ✨ ✦';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  color: rgba(255, 209, 102, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: -1;
+  animation: sparkleOrbit 1.6s ease-out forwards;
+}
+@keyframes sparkleOrbit {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  50%  { opacity: 0.6; transform: translate(-50%, -50%) scale(1.3) rotate(90deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(180deg); }
 }
 
 img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
@@ -1128,6 +1149,1079 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 }
 @keyframes correctPop {
   0%   { transform: scale(1); }
-  50%  { transform: scale(1.4); }
+  50%  { transform: scale(1.4) rotate(8deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+/* === v18: Level 4 节奏小河 + 鼓 === */
+.level4-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    #14323d 0%,
+    #1a4554 30%,
+    #235e6c 60%,
+    #1f4350 90%,
+    #0d2230 100%);
+  z-index: 1;
+}
+.level4-background svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 水草 (摇曳) */
+.level4-plant {
+  stroke: #1d4d2a;
+  stroke-width: 4;
+  fill: none;
+  animation: level4PlantSway 5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: bottom;
+  stroke-linecap: round;
+}
+.level4-plants-far .level4-plant:nth-child(2) { animation-delay: 0.6s; animation-duration: 4.5s; }
+.level4-plants-far .level4-plant:nth-child(3) { animation-delay: 1.2s; animation-duration: 5.5s; }
+.level4-plants-far .level4-plant:nth-child(4) { animation-delay: 1.8s; animation-duration: 4.8s; }
+.level4-plants-far .level4-plant:nth-child(5) { animation-delay: 2.4s; animation-duration: 5.2s; }
+@keyframes level4PlantSway {
+  0%, 100% { transform: rotate(-3deg) scaleY(1); }
+  50%      { transform: rotate(3deg)  scaleY(1.04); }
+}
+
+/* 鼓面文字 */
+.level4-drum-text {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  fill: #5d3a1a;
+  pointer-events: none;
+}
+
+/* 节拍提示红环 (默认隐藏) */
+.level4-beat-cue {
+  filter: drop-shadow(0 0 8px #ff5252);
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* 大鼓 wrap (inner) — 点击动画. anchor 处理绝对定位 */
+.level4-drum-anchor {
+  pointer-events: auto;
+}
+.level4-drum-wrap {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 80ms ease-in;
+  pointer-events: auto;
+}
+.level4-drum-wrap.level4-drum-hit {
+  transform: scale(0.96) translateY(8px);
+  transition: transform 80ms ease-in;
+}
+.level4-drum-hit .level4-drum-lacing line,
+.level4-drum-hit .level4-drum-lacing circle {
+  filter: brightness(0.85);
+}
+
+/* 节奏泡泡 (流过屏幕的节拍球) */
+.level4-bubbles-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+}
+.level4-bubble {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%,
+    rgba(255, 255, 255, 0.95),
+    rgba(168, 218, 220, 0.7) 70%,
+    rgba(120, 180, 200, 0.5));
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 80, 100, 0.7);
+  font-weight: 900;
+  box-shadow:
+    inset 0 0 12px rgba(255, 255, 255, 0.7),
+    0 4px 12px rgba(0, 0, 0, 0.25);
+  left: 0;
+  top: 0;
+}
+.level4-bubble--double {
+  background: radial-gradient(circle at 30% 30%,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 220, 130, 0.75) 60%,
+    rgba(220, 165, 80, 0.55));
+  border-color: rgba(255, 220, 130, 0.85);
+  color: rgba(120, 70, 0, 0.8);
+}
+.level4-bubble-half {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+/* === v17.8: Level 3 五声音阶山谷 === */
+.level3-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    #fff8ec 0%,
+    #ffd9a8 30%,
+    #f4a261 60%,
+    #e76f51 80%,
+    #8c5a3c 100%);
+  z-index: 1;
+  pointer-events: none;  /* 背景不抢事件 — 让鱼可拖 */
+}
+.level3-background svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.level3-sun {
+  fill: #fff8a8;
+  filter: drop-shadow(0 0 30px #ffd166) drop-shadow(0 0 60px #f4a261);
+  animation: sunPulse 4s ease-in-out infinite;
+  transform-origin: 650px 100px;
+}
+@keyframes sunPulse {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50%      { transform: scale(1.06); opacity: 1; }
+}
+.level3-bird {
+  fill: none;
+  stroke: rgba(70, 50, 40, 0.55);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: birdFly 8s ease-in-out infinite;
+}
+.level3-bird:nth-of-type(2) { animation-delay: -2s; animation-duration: 10s; }
+.level3-bird:nth-of-type(3) { animation-delay: -4s; animation-duration: 12s; }
+@keyframes birdFly {
+  0%   { transform: translateX(-30px) translateY(0); opacity: 0; }
+  10%  { opacity: 1; }
+  50%  { transform: translateX(300px) translateY(-10px); opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(700px) translateY(0); opacity: 0; }
+}
+.level3-mountain-far {
+  fill: rgba(116, 142, 168, 0.55);
+}
+.level3-mountain-mid {
+  fill: rgba(82, 109, 130, 0.75);
+}
+.level3-mountain-near {
+  fill: rgba(54, 79, 99, 0.85);
+}
+.level3-river {
+  fill: rgba(168, 218, 220, 0.7);
+  animation: riverShimmer 6s ease-in-out infinite;
+}
+@keyframes riverShimmer {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 0.85; }
+}
+.level3-platform-base {
+  fill: rgba(0, 0, 0, 0.25);
+}
+.level3-platform-body {
+  fill: #8b5a2b;
+  stroke: rgba(0, 0, 0, 0.3);
+  stroke-width: 2;
+}
+.level3-platform-top {
+  fill: #5d8a4b;
+  stroke: rgba(0, 0, 0, 0.3);
+  stroke-width: 1.5;
+}
+.level3-platform[data-note="mi"] .level3-platform-body { fill: #6b9a5b; }
+.level3-platform[data-note="sol"] .level3-platform-body { fill: #4d6f3f; }
+.level3-platform-label {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  fill: white;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 3;
+}
+.level3-platform {
+  animation: platformBreath 3s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.level3-platform[data-note="do"]  { animation-delay: 0s; }
+.level3-platform[data-note="mi"]  { animation-delay: 0.4s; }
+.level3-platform[data-note="sol"] { animation-delay: 0.8s; }
+@keyframes platformBreath {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.level3-hand-text {
+  font-size: 64px;
+  animation: handFloat 3.5s ease-in-out infinite;
+  transform-origin: 400px 50px;
+  transform-box: fill-box;
+}
+@keyframes handFloat {
+  0%, 100% { transform: rotate(-8deg); }
+  50%      { transform: rotate(8deg); }
+}
+
+/* === v17.8: Level 5 小星星视奏 === */
+.level5-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    #1a1a4a 0%,
+    #2a2050 25%,
+    #4a2a55 50%,
+    #6a2a45 75%,
+    #4a1a30 100%);
+  z-index: 1;
+}
+.level5-background svg {
+  width: 100%;
+  height: 100%;
+}
+.level5-stars-tiny {
+  fill: rgba(255, 255, 255, 0.85);
+  animation: starTwinkle 4s ease-in-out infinite;
+}
+@keyframes starTwinkle {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+.level5-moon {
+  filter: drop-shadow(0 0 20px rgba(255, 248, 220, 0.5));
+}
+.level5-star-big {
+  animation: starSpin 8s linear infinite;
+  transform-origin: center;
+}
+.level5-star-big:nth-child(2) { animation-delay: 0.5s; }
+.level5-star-big:nth-child(3) { animation-delay: 1s; }
+@keyframes starSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.level5-trees {
+  fill: #1a1420;
+}
+.level5-staff-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 40%;
+  z-index: 10;
+  pointer-events: none;
+}
+.level5-staff {
+  width: 100%;
+  height: 100%;
+}
+.level5-staff-line {
+  stroke: rgba(255, 248, 168, 0.7);
+  stroke-width: 1.4;
+}
+.level5-current-note {
+  transition: opacity 0.2s;
+}
+.level5-current-note.incorrect {
+  fill: #ff5252 !important;
+  animation: noteWiggle 0.3s ease-in-out;
+}
+@keyframes noteWiggle {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+/* === v17.9: Level 8 森林音乐会 + 舞台 === */
+.level8-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    #1a0a3a 0%,
+    #2a0a45 30%,
+    #3d0a55 60%,
+    #1a0820 90%,
+    #0a0510 100%);
+  z-index: 1;
+}
+.level8-background svg {
+  width: 100%;
+  height: 100%;
+}
+.level8-curtain {
+  filter: drop-shadow(0 0 12px rgba(140, 36, 52, 0.5));
+  animation: curtainSway 6s ease-in-out infinite;
+  transform-origin: top center;
+}
+.level8-curtain-r {
+  transform-origin: top center;
+}
+@keyframes curtainSway {
+  0%, 100% { transform: skewY(0deg); }
+  50%      { transform: skewY(2deg); }
+}
+.level8-stage-text {
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  fill: rgba(255, 235, 100, 0.95);
+  filter: drop-shadow(0 0 6px #ffd166);
+}
+.level8-spotlight-c {
+  animation: spotPulse 3s ease-in-out infinite;
+  transform-origin: 400px 0;
+}
+@keyframes spotPulse {
+  0%, 100% { opacity: 0.15; }
+  50%      { opacity: 0.28; }
+}
+.level8-firefly {
+  animation: fireflyDance 4s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.level8-firefly:nth-child(odd) { animation-delay: 0.5s; }
+.level8-firefly:nth-child(even) { animation-delay: 1s; }
+@keyframes fireflyDance {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.7; }
+  50%      { transform: translateY(-15px) translateX(8px); opacity: 1; }
+}
+.level8-song-stage {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  text-align: center;
+  width: 90%;
+  max-width: 600px;
+  pointer-events: none;
+}
+.level8-song-list-title {
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: rgba(255, 235, 100, 0.95);
+  margin-bottom: 16px;
+  text-shadow: 0 0 8px rgba(255, 209, 102, 0.5);
+}
+.level8-song-cards {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.level8-song-card {
+  background: rgba(15, 10, 30, 0.85);
+  border: 3px solid rgba(255, 235, 100, 0.5);
+  border-radius: 20px;
+  padding: 14px 18px;
+  cursor: pointer;
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  text-align: center;
+  color: white;
+  transition: transform 200ms ease-out, box-shadow 200ms;
+  min-width: 96px;
+  pointer-events: auto;
+}
+.level8-song-card:hover,
+.level8-song-card:active {
+  transform: scale(1.05);
+  box-shadow: 0 0 24px rgba(255, 235, 100, 0.4);
+}
+.level8-song-emoji {
+  font-size: 44px;
+  margin-bottom: 6px;
+  line-height: 1;
+}
+.level8-song-name {
+  font-size: 18px;
+  font-weight: 900;
+}
+.level8-song-len {
+  font-size: 12px;
+  color: rgba(255, 235, 100, 0.7);
+  margin-top: 4px;
+}
+.level8-now-playing {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: center;
+  background: rgba(15, 10, 30, 0.85);
+  border: 2px solid rgba(255, 235, 100, 0.4);
+  border-radius: 16px;
+  padding: 10px 18px;
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+}
+.level8-now-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+.level8-now-text {
+  font-size: 16px;
+  color: white;
+}
+.level8-now-text strong {
+  color: rgba(255, 235, 100, 0.95);
+}
+.level8-progress {
+  font-size: 13px;
+  font-weight: 900;
+  color: rgba(255, 235, 100, 0.95);
+  background: rgba(255, 235, 100, 0.15);
+  padding: 4px 12px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+.level8-staff-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 40%;
+  z-index: 10;
+  pointer-events: none;
+}
+.level8-staff {
+  width: 100%;
+  height: 100%;
+}
+.level8-staff-line {
+  stroke: rgba(255, 248, 168, 0.7);
+  stroke-width: 1.4;
+}
+.level8-current-note {
+  transition: opacity 0.2s;
+}
+.level8-current-note.incorrect {
+  fill: #ff5252 !important;
+  animation: noteWiggle 0.3s ease-in-out;
+}
+
+/* === v17.8: Level 6 钢琴教室 === */
+.level6-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    #fff8ec 0%,
+    #f4d4a8 40%,
+    #d4a574 70%,
+    #a87a55 100%);
+  z-index: 1;
+}
+.level6-background svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.level6-deco {
+  filter: blur(2px);
+}
+.level6-notes-deco,
+.level6-notes-float {
+  pointer-events: none;
+}
+.level6-notes-float .level6-note-float {
+  animation: level6NoteFloat 4s ease-in-out infinite;
+}
+.level6-notes-float .level6-note-float:nth-child(2) {
+  animation-delay: 1.2s;
+}
+.level6-notes-float .level6-note-float:nth-child(3) {
+  animation-delay: 2.6s;
+}
+@keyframes level6NoteFloat {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50%      { transform: translateY(-12px); opacity: 1; }
+}
+.level6-teacher {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
+  animation: level6TeacherBob 3.2s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes level6TeacherBob {
+  0%, 100% { transform: translate(620px, 100px); }
+  50%      { transform: translate(620px, 92px); }
+}
+.level6-hand {
+  animation: level6HandWave 1.4s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+.level6-hand--r {
+  animation-delay: 0.7s;
+}
+@keyframes level6HandWave {
+  0%, 100% { transform: translate(-32px, 32px) rotate(0deg); }
+  50%      { transform: translate(-32px, 32px) rotate(-12deg); }
+}
+.level6-hand--r {
+  /* override transform origin via animation in Level6Scene (translate already in keyframe) */
+}
+.level6-arrow {
+  animation: level6ArrowBlink 1.1s ease-in-out infinite;
+}
+@keyframes level6ArrowBlink {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+.level6-piano-shape {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+/* 键盘左右手分区色 (覆盖 PianoKeyboard 默认白键 fill) */
+.level6-lh .key__shape {
+  fill: #d8f0d8 !important;
+  stroke: #6bbf7e !important;
+}
+.level6-rh .key__shape {
+  fill: #fff3b8 !important;
+  stroke: #d6a020 !important;
+}
+/* 按下双键时整体高亮 */
+.level6-pressed .key__shape {
+  fill: #ffd166 !important;
+  filter: drop-shadow(0 0 18px rgba(255, 209, 102, 0.85));
+}
+/* 屏幕闪光 (答对时) */
+.level6-flash {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 250, 220, 0.85), rgba(255, 250, 220, 0));
+  pointer-events: none;
+  z-index: 1000;
+  animation: level6FlashFade 0.55s ease-out forwards;
+}
+@keyframes level6FlashFade {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* 左右手标签 (白字带描边) */
+.level6-hand-tag {
+  user-select: none;
+}
+
+
+/* ============================================
+   v19 — 质感打磨 (遮罩星空 / 按钮弹性 / 鱼池对比 / 标题入场)
+   ============================================ */
+
+/* B. 通关遮罩: 柔和闪烁星空背景 */
+.overlay {
+  background: rgba(43, 58, 74, 0.75) !important;
+}
+.overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(2px 2px at 20% 30%, rgba(255,235,168,0.8), transparent),
+    radial-gradient(2px 2px at 60% 70%, rgba(255,235,168,0.6), transparent),
+    radial-gradient(2px 2px at 80% 20%, rgba(255,235,168,0.7), transparent),
+    radial-gradient(1.5px 1.5px at 30% 80%, rgba(168,218,220,0.6), transparent),
+    radial-gradient(1.5px 1.5px at 70% 50%, rgba(255,179,71,0.5), transparent),
+    radial-gradient(1px 1px at 50% 50%, rgba(255,255,255,0.4), transparent);
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: -1;
+  animation: overlayTwinkle 4s ease-in-out infinite;
+}
+@keyframes overlayTwinkle {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.9; }
+}
+
+/* C. 次要按钮 hover: 更弹 */
+.btn-secondary:hover, .btn-secondary:focus {
+  transform: scale(1.05) translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  background: #fff8ec;
+}
+
+/* D. 鱼池: 加径向渐变背景, 让鱼更突出 */
+.fish-pool {
+  background: radial-gradient(ellipse at center, rgba(168, 218, 220, 0.18), transparent 70%);
+}
+
+/* F. 通关遮罩标题 / 文字入场动画 */
+.overlay__title {
+  animation: overlayTitleSlide 800ms var(--ease-back);
+}
+@keyframes overlayTitleSlide {
+  0%   { transform: translateY(-30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.overlay__text {
+  animation: overlayTextFade 1000ms ease-out 200ms backwards;
+}
+@keyframes overlayTextFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* === v17.8: 关卡地图 === */
+.level-map-overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, #1a3a4a 0%, #2a5a55 50%, #1a3a2a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 300ms ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.level-map-card {
+  background: var(--bg-cream);
+  border-radius: var(--r-lg);
+  padding: 32px 28px 24px;
+  max-width: 720px;
+  width: 92%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+.level-map-title {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--staff-strong);
+  margin-bottom: 4px;
+}
+.level-map-subtitle {
+  font-family: 'Nunito', sans-serif;
+  font-size: 15px;
+  color: var(--text-sub);
+  margin-bottom: 24px;
+}
+.level-map-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.level-map-tile {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 248, 236, 0.85));
+  border: 3px solid var(--tile-accent, var(--warm-cta));
+  border-radius: 16px;
+  padding: 12px 8px;
+  cursor: pointer;
+  font-family: 'Nunito', sans-serif;
+  text-align: center;
+  transition: transform 200ms var(--ease-bounce), box-shadow 200ms;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.level-map-tile:hover,
+.level-map-tile:focus {
+  transform: translateY(-4px) scale(1.04);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+.level-map-tile.selected {
+  transform: scale(0.92);
+  transition: transform 100ms;
+}
+.level-map-tile__emoji {
+  font-size: 36px;
+  line-height: 1;
+}
+.level-map-tile__id {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 12px;
+  color: var(--tile-accent, var(--warm-cta));
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.level-map-tile__name {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--staff-strong);
+}
+.level-map-tile__desc {
+  font-size: 11px;
+  color: var(--text-sub);
+  line-height: 1.3;
+}
+.level-map-tile__stars {
+  font-size: 14px;
+  color: var(--warm-cta);
+  margin-top: 2px;
+}
+.level-map-footer {
+  font-size: 12px;
+  color: var(--text-sub);
+  opacity: 0.6;
+  margin-top: 8px;
+}
+
+/* Mobile: 4-column too tight, use 2-col */
+@media (max-width: 600px) {
+  .level-map-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .level-map-card {
+    padding: 20px 16px 16px;
+  }
+  .level-map-title { font-size: 22px; }
+}
+
+/* ============================================
+   整体视觉打磨 — 提升"质感"
+   - 关卡地图: 飘动树叶 + 顶部光晕
+   - 每个关卡: 专属主题色
+   - 主按钮: 弹性按下
+   - 气泡: 三角尾巴
+   - +1⭐: 更 Q 弹的飘字
+   ============================================ */
+
+/* --- 关卡地图装饰层 (在 card 后面, 视觉上"森林氛围") --- */
+.level-map-overlay {
+  position: fixed;
+  overflow: hidden;
+}
+.level-map-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><path d='M30,25 Q40,15 50,25 Q40,35 30,25 Z' fill='%2384cc16' opacity='0.55'/><circle cx='120' cy='40' r='2' fill='%23ffd166' opacity='0.7'/><path d='M70,100 Q78,92 86,100 Q78,108 70,100 Z' fill='%23a3e635' opacity='0.5'/><circle cx='30' cy='120' r='1.5' fill='%23fef3c7' opacity='0.85'/><path d='M120,130 Q128,122 136,130 Q128,138 120,130 Z' fill='%23fbbf24' opacity='0.45'/></svg>");
+  background-size: 220px 220px;
+  animation: levelMapDrift 30s linear infinite;
+  opacity: 0.7;
+  z-index: 0;
+}
+.level-map-overlay::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center top,
+    rgba(255, 235, 168, 0.22),
+    transparent 65%);
+  z-index: 0;
+}
+@keyframes levelMapDrift {
+  from { background-position: 0 0; }
+  to   { background-position: 220px 220px; }
+}
+
+/* 让 card 浮在装饰层之上 */
+.level-map-card { position: relative; z-index: 1; }
+
+/* --- 每个关卡主题色 (与 LEVEL_META.theme 呼应) --- */
+.level-map-tile[data-id="1"] {
+  background: linear-gradient(135deg, #e8f5f7, #a8dadc);
+}
+.level-map-tile[data-id="2"] {
+  background: linear-gradient(135deg, #2a3a4a, #1e2a3a);
+  color: #fff;
+}
+.level-map-tile[data-id="2"] :is(.level-map-tile__name,
+                                  .level-map-tile__id,
+                                  .level-map-tile__desc) {
+  color: rgba(255, 255, 255, 0.95);
+}
+.level-map-tile[data-id="3"] {
+  background: linear-gradient(135deg, #fef3c7, #f4a261);
+}
+.level-map-tile[data-id="4"] {
+  background: linear-gradient(135deg, #2a6870, #1a3a4a);
+  color: #fff;
+}
+.level-map-tile[data-id="4"] :is(.level-map-tile__name,
+                                  .level-map-tile__id,
+                                  .level-map-tile__desc) {
+  color: rgba(255, 255, 255, 0.92);
+}
+.level-map-tile[data-id="5"] {
+  background: linear-gradient(135deg, #4a2a55, #1a1a4a);
+  color: #fff;
+}
+.level-map-tile[data-id="5"] :is(.level-map-tile__name,
+                                  .level-map-tile__id,
+                                  .level-map-tile__desc) {
+  color: rgba(255, 255, 255, 0.92);
+}
+.level-map-tile[data-id="6"] {
+  background: linear-gradient(135deg, #fff8ec, #d4a574);
+}
+.level-map-tile[data-id="7"] {
+  background: linear-gradient(135deg, #84cc16, #65a30d);
+  color: #fff;
+}
+.level-map-tile[data-id="7"] :is(.level-map-tile__name,
+                                  .level-map-tile__id,
+                                  .level-map-tile__desc) {
+  color: rgba(255, 255, 255, 0.95);
+}
+.level-map-tile[data-id="8"] {
+  background: linear-gradient(135deg, #3d0a55, #1a0a3a);
+  color: #fff;
+}
+.level-map-tile[data-id="8"] :is(.level-map-tile__name,
+                                  .level-map-tile__id,
+                                  .level-map-tile__desc) {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* tile: 加 inner glow, 让卡片更立体 */
+.level-map-tile {
+  box-shadow: var(--shadow-paper-1),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+/* --- 关卡地图卡片 / tile 入场更从容 --- */
+.level-map-card {
+  animation: cardRise 520ms var(--ease-out-soft);
+}
+@keyframes cardRise {
+  0%   { transform: translateY(20px) scale(0.94); opacity: 0; }
+  100% { transform: translateY(0) scale(1);    opacity: 1; }
+}
+.level-map-tile {
+  animation: tilePop 480ms var(--ease-bounce) backwards;
+}
+.level-map-tile:nth-child(1) { animation-delay: 80ms;  }
+.level-map-tile:nth-child(2) { animation-delay: 140ms; }
+.level-map-tile:nth-child(3) { animation-delay: 200ms; }
+.level-map-tile:nth-child(4) { animation-delay: 260ms; }
+.level-map-tile:nth-child(5) { animation-delay: 320ms; }
+.level-map-tile:nth-child(6) { animation-delay: 380ms; }
+.level-map-tile:nth-child(7) { animation-delay: 440ms; }
+.level-map-tile:nth-child(8) { animation-delay: 500ms; }
+@keyframes tilePop {
+  0%   { transform: translateY(16px) scale(0.7); opacity: 0; }
+  60%  { transform: translateY(-4px) scale(1.05); opacity: 1; }
+  100% { transform: translateY(0) scale(1);    opacity: 1; }
+}
+
+/* --- 主按钮: 弹性按下 + hover 内发光 --- */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center,
+    rgba(255, 255, 255, 0.55),
+    transparent 60%);
+  opacity: 0;
+  transition: opacity 220ms ease-out;
+  pointer-events: none;
+}
+.btn-primary:hover::before,
+.btn-primary:focus-visible::before {
+  opacity: 1;
+}
+.btn-primary:active {
+  animation: btnPress 260ms ease-out;
+}
+@keyframes btnPress {
+  0%   { transform: scale(1); }
+  28%  { transform: scale(0.92); }
+  55%  { transform: scale(1.06); }
   100% { transform: scale(1); }
+}
+
+/* --- 气泡小尾巴 (指向鱼/舞台) --- */
+.bubble { position: relative; }
+.bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 28px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 14px solid var(--bg-cream);
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.05));
+}
+
+/* --- +1 ⭐ 飘字: 更 Q 弹的版本 --- */
+.score-float {
+  font-size: 42px;
+  text-shadow:
+    -2px -2px 0 #fff, 2px -2px 0 #fff,
+    -2px 2px 0 #fff,  2px 2px 0 #fff,
+    0 5px 0 rgba(0, 0, 0, 0.18);
+  animation: scoreRiseSpin 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes scoreRiseSpin {
+  0%   { transform: translate(-50%, -50%) scale(0.3)  rotate(-12deg); opacity: 0; }
+  35%  { transform: translate(-50%, -75%) scale(1.5)  rotate(6deg);   opacity: 1; }
+  60%  { transform: translate(-50%, -110%) scale(1.1) rotate(-3deg);  opacity: 1; }
+  100% { transform: translate(-50%, -190%) scale(0.95) rotate(0deg);  opacity: 0; }
+}
+
+/* --- 整体按钮触摸手感 --- */
+button, .hud__btn, .btn-primary, .btn-secondary {
+  -webkit-tap-highlight-color: rgba(255, 235, 100, 0.35);
+  cursor: pointer;
+}
+button:active:not(:disabled),
+.hud__btn:active {
+  transform: scale(0.93);
+  transition: transform 60ms ease-out;
+}
+
+/* --- HUD 按钮: hover 时淡淡的高光晕 --- */
+.hud__btn {
+  position: relative;
+  overflow: hidden;
+}
+.hud__btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at center,
+    rgba(255, 209, 102, 0.35),
+    transparent 65%);
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+  pointer-events: none;
+}
+.hud__btn:hover::before,
+.hud__btn:active::before { opacity: 1; }
+
+/* === v17.8: Level 7 树屋完整 7 音阶 === */
+.level7-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    #fef3c7 0%,
+    #fde68a 30%,
+    #84cc16 60%,
+    #65a30d 80%,
+    #365314 100%);
+  z-index: 1;
+}
+.level7-background svg {
+  width: 100%;
+  height: 100%;
+}
+.level7-mountains {
+  fill: rgba(54, 83, 20, 0.7);
+}
+.level7-sun {
+  filter: drop-shadow(0 0 18px rgba(255, 248, 168, 0.8));
+  animation: sunGlow 4s ease-in-out infinite;
+  transform-origin: 700px 80px;
+  transform-box: fill-box;
+}
+.level7-sun-glow {
+  animation: sunPulse 4s ease-in-out infinite;
+  transform-origin: 700px 80px;
+  transform-box: fill-box;
+}
+@keyframes sunGlow {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+@keyframes sunPulse {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(1.15); }
+}
+.level7-tree {
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.25));
+}
+.level7-leaves {
+  animation: leavesSway 5s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.level7-leaves:nth-child(2) { animation-delay: 0.4s; }
+.level7-leaves:nth-child(3) { animation-delay: 0.8s; }
+.level7-leaves:nth-child(4) { animation-delay: 1.2s; }
+@keyframes leavesSway {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50%      { transform: scale(1.04) rotate(1.5deg); }
+}
+.level7-treehouse {
+  animation: treehouseBob 6s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes treehouseBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+.level7-step {
+  cursor: default;
+  transition: transform 0.3s ease-out;
+}
+.level7-step circle:nth-child(2) {
+  animation: stepPulse 2.5s ease-in-out infinite;
+}
+.level7-step[data-note="do"]  circle { animation-delay: 0s; }
+.level7-step[data-note="re"]  circle { animation-delay: 0.15s; }
+.level7-step[data-note="mi"]  circle { animation-delay: 0.3s; }
+.level7-step[data-note="fa"]  circle { animation-delay: 0.45s; }
+.level7-step[data-note="sol"] circle { animation-delay: 0.6s; }
+.level7-step[data-note="la"]  circle { animation-delay: 0.75s; }
+.level7-step[data-note="si"]  circle { animation-delay: 0.9s; }
+@keyframes stepPulse {
+  0%, 100% { fill: rgba(255,255,255,0.5); }
+  50%      { fill: rgba(255,255,255,0.85); }
+}
+.level7-bubbles circle {
+  animation: bubbleFloat 8s ease-in-out infinite;
+}
+.level7-bubbles circle:nth-child(1) { animation-delay: 0s; }
+.level7-bubbles circle:nth-child(2) { animation-delay: 0.7s; }
+.level7-bubbles circle:nth-child(3) { animation-delay: 1.4s; }
+.level7-bubbles circle:nth-child(4) { animation-delay: 2.1s; }
+.level7-bubbles circle:nth-child(5) { animation-delay: 2.8s; }
+.level7-bubbles circle:nth-child(6) { animation-delay: 3.5s; }
+@keyframes bubbleFloat {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50%      { transform: translateY(-20px); opacity: 0.9; }
+}
+.level7-birds path {
+  animation: birdFloat 7s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.level7-birds path:nth-child(1) { animation-delay: 0s; }
+.level7-birds path:nth-child(2) { animation-delay: 1.5s; }
+@keyframes birdFloat {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  50%      { transform: translateX(8px) translateY(-6px); }
 }

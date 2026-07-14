@@ -36,6 +36,7 @@ if (typeof window !== 'undefined') {
 }
 import { Background } from '../components/Background.js';
 import { Pip } from '../components/Pip.js';
+import { LevelMap } from '../components/LevelMap.js';
 import confetti from 'canvas-confetti';
 import { gsap } from 'gsap';
 
@@ -343,45 +344,25 @@ export class Game {
     if (btnReplay) btnReplay.style.display = show ? 'none' : '';
   }
 
-  /** 通关后的开始遮罩 */
+  /** 关卡地图选择器 (取代旧的"点我开始"遮罩) */
   _showStartOverlay() {
-    // 如果之前有过 win overlay, 先清掉 (重玩时调)
+    // 清掉旧 overlay
     document.querySelectorAll('.overlay').forEach((el) => el.remove());
 
-    const overlay = document.createElement('div');
-    overlay.className = 'overlay';
-    overlay.innerHTML = `
-      <div class="overlay__card">
-        <div class="overlay__title" style="font-size:56px;margin-bottom:8px">🐤</div>
-        <h2 class="overlay__title">森林钢琴学校</h2>
-        <p class="overlay__text">帮 7 条小鱼 Do Re Mi Fa Sol La Si<br>找到它们在钢琴上的家!</p>
-        <button class="btn-primary" id="start-btn">点我开始 ›</button>
-      </div>
-    `;
-    document.body.appendChild(overlay);
+    // Hide any HUD elements from previous levels
+    const hudLevel2 = document.getElementById('hud-level2');
+    if (hudLevel2) hudLevel2.style.display = 'none';
 
-    // iOS Safari: pointerdown 比 click 灵敏得多, 立即响应 + 立即解锁音频
-    let started = false;
-    const onStart = async (e) => {
-      if (started) return;
-      started = true;
-      if (e) e.preventDefault();
-
-      // 关键: 不 await 音频加载! 立刻进游戏, 钢琴采样在后台慢慢加载
-      // unlockOnGesture 内部用合成器做 fallback, 立刻能出声
-      this.audio.unlockOnGesture().catch((err) => console.warn(err));
-      overlay.remove();
-      this._beginLevel();
-    };
-
-    // 用 pointerdown 立即响应, 不用 click (iOS 有 300ms 延迟)
-    const btn = overlay.querySelector('#start-btn');
-    btn.addEventListener('pointerdown', onStart);
-    // 整张遮罩也可点 (兜底)
-    overlay.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('#start-btn')) return;
-      onStart(e);
+    const map = new LevelMap(this.stage, {
+      progress: this.progress,
+      onSelect: (id) => {
+        // 解锁 audio 然后启动关卡
+        this.audio.unlockOnGesture().catch((e) => console.warn(e));
+        map.hide();
+        this.start({ levelId: id });
+      },
     });
+    map.show();
   }
 
   _beginLevel() {
