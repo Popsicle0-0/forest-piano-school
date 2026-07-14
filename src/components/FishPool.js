@@ -372,6 +372,38 @@ export class FishPool {
     };
     start();
   }
+
+  /**
+   * 重置: 把鱼送回初始位置 + 重新弹入
+   * (重玩时 Game.js 调用)
+   */
+  reset() {
+    if (!this.pool) return;
+    this.fishes.forEach((fish) => {
+      fish.el.classList.remove('dragging', 'shake');
+      fish.el.style.position = '';
+      fish.el.style.left = `${fish.originalLeft}px`;
+      fish.el.style.top = `${fish.originalTop}px`;
+      fish.el.style.right = '';
+      fish.el.style.bottom = '';
+      fish.el.style.margin = '';
+      fish.el.style.transform = '';
+      fish.inner.style.animationPlayState = '';
+      // 重新入场动画 (用 fromTo, y 从下方偏移开始)
+      gsap.fromTo(
+        fish.el,
+        { y: 60, opacity: 0.6, scale: 0.85 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.5, ease: 'back.out(1.4)', delay: Math.random() * 0.15 }
+      );
+    });
+  }
+
+  /**
+   * 拿到所有鱼 DOM (Game.js 重置星星等用)
+   */
+  getFishes() {
+    return this.fishes.map((f) => f.el);
+  }
 }
 
 export default FishPool;

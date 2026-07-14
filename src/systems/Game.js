@@ -1,11 +1,19 @@
 /**
  * Game 控制器 - 关卡 1 状态机
- * 负责: 加载场景、驱动关卡逻辑、判定通关、调度反馈
+ * 负责: 加载场景、驱动关卡逻辑、判定通关、调度反馈、引导气泡、重玩
  *
- * 启动流程(关键):
- *   1) 渲染场景(背景/五线谱/键盘/鱼池/Pip)→ 用户能看到
- *   2) 弹出"点我开始"遮罩 → 用户首次触摸触发 Tone.start()
- *   3) 遮罩关闭 → 鱼入场动画 → 接受拖拽
+ * 引导气泡状态机 (v16 新增):
+ *   pre_start  →  intro   →  hint_listen  →  hint_first_drop
+ *   →  hint_keep_going (按 N 调整文案)
+ *   →  wrong_drop (鱼 id 决定文案)
+ *   →  idle_stuck (15s 无活动触发)
+ *   →  win (通关, 显示星级)
+ *
+ * 重玩支持 (v16 新增):
+ *   restartLevel() → 清空 staff + 鱼归位 + 重置 placed + 错误计数 + 星星
+ *
+ * 星级 (v16 新增):
+ *   wrongCount 决定星数: 0 错=3⭐, 1-2 错=2⭐, 3-5 错=1⭐, 6+ 错=0⭐
  */
 import { Staff } from '../components/Staff.js';
 import { PianoKeyboard } from '../components/PianoKeyboard.js';
@@ -26,6 +34,14 @@ const NOTES = [
   { id: 'si',  solfege: 'Si',  pitch: 'B4', note: 'B', color: '#9b5de5' },
 ];
 
+const ENCOURAGE = [
+  '真棒!',
+  '太厉害了~',
+  '不错哟!',
+  '加油加油!',
+  '马上就完成了!',
+];
+
 export class Game {
   constructor({ stageEl, bubbleEl, progress, audio }) {
     this.stage = stageEl;
@@ -33,7 +49,13 @@ export class Game {
     this.progress = progress;
     this.audio = audio;
     this.placed = new Set();
-    this.gate = false; // 必须等用户首次点击后才放行
+    this.wrongCount = 0;           // v16: 错误数 (算星用)
+    this.hasTappedFish = false;    // v16: 是否单击听过鱼声
+    this.hasStartedDrag = false;   // v16: 是否拖过任何一条
+    this.gate = false;             // 必须等用户首次点击后才放行
+    this._lastActivityAt = 0;      // v16: 用户最后操作时间
+    this._idleNudgeScheduled = false;
+    this._hintTimer = null;
   }
 
   /**
@@ -54,12 +76,22 @@ export class Game {
 
     // 2) 鱼 → 五线谱 落点回调
     this.fishPool.onDrop = (fish, slotEl, accepted) => this.onFishDrop(fish, slotEl, accepted);
-    this.fishPool.onDragStart = (fish) => this.audio.hover(fish.dataset.id);
+    this.fishPool.onDragStart = (fish) => {
+      this._markActivity();
+      if (!this.hasStartedDrag) this.hasStartedDrag = true;
+      this.audio.hover(fish.dataset.id);
+    };
     this.fishPool.onDragMove = (_fish, slotEl) => {
+      this._markActivity();
       if (slotEl && this.staff) this.staff.showHint(slotEl.dataset.id);
       else if (this.staff) this.staff.clearHint();
     };
     this.fishPool.onTap = (fish) => {
+      this._markActivity();
+      if (!this.hasTappedFish) {
+        this.hasTappedFish = true;
+        this._advanceHint('first_tap');
+      }
       // 单击 = 听这条鱼的音
       try { this.audio.playNote(fish.dataset.pitch); } catch (_) {}
       try { this.audio.hover(fish.dataset.id); } catch (_) {}
@@ -69,6 +101,7 @@ export class Game {
 
     // 3) 钢琴键直接弹奏(辅助听声)
     this.kb.onPress = (keyEl) => {
+      this._markActivity();
       this.audio.playNote(keyEl.dataset.pitch);
       this.kb.glowKey(keyEl);
     };
@@ -79,6 +112,9 @@ export class Game {
 
   /** 通关后的开始遮罩 */
   _showStartOverlay() {
+    // 如果之前有过 win overlay, 先清掉 (重玩时调)
+    document.querySelectorAll('.overlay').forEach((el) => el.remove());
+
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
@@ -117,10 +153,11 @@ export class Game {
 
   _beginLevel() {
     this.gate = true;
-    this.say('把小鱼拖到上面的五线谱上!看唱名对应位置～');
+    this._markActivity();
+    this.say('欢迎来到森林!🐤 点点小鱼, 听听它们的声音~');
     this.fishPool.intro();
-    // 让五线谱 7 个 slot 依次脉冲,作为视觉提示
     this._pulseStaff();
+    this._enterHint('intro');
   }
 
   _pulseStaff() {
@@ -135,15 +172,139 @@ export class Game {
   }
 
   // ============================================================
+  // v16: 引导气泡状态机
+  // ============================================================
+
+  _markActivity() {
+    this._lastActivityAt = Date.now();
+  }
+
+  _clearHintTimer() {
+    if (this._hintTimer) {
+      clearTimeout(this._hintTimer);
+      this._hintTimer = null;
+    }
+  }
+
+  /** 进入某个状态 (设置 bubble text + 类名 + pulse) */
+  _enterHint(state) {
+    if (!this.bubble) return;
+    this._clearHintTimer();
+    let text = '';
+    switch (state) {
+      case 'intro':
+        text = '先把手指放在小鱼上, 听听它唱的啥 🎵';
+        this._scheduleIdleNudge(12000, 'idle_1');
+        break;
+      case 'hint_listen':
+        text = '先随便摸一条鱼听听它的声音吧~ 🐟';
+        this._scheduleIdleNudge(14000, 'idle_1');
+        break;
+      case 'first_tap':
+        text = '听到了吗? 这种声音在钢琴上也有哦! 🎹';
+        this._scheduleIdleNudge(10000, 'idle_drag');
+        break;
+      case 'hint_drag':
+        text = '试试长按这条鱼, 拖到上面五线谱 Do 的位置~';
+        this._scheduleIdleNudge(10000, 'idle_drag');
+        break;
+      case 'first_correct':
+        text = this._placedOnText(this.firstCorrectNote) + ' 找到了家! 还有 ' + (NOTES.length - 1) + ' 条要帮~';
+        this._scheduleIdleNudge(12000, 'idle_keep_going');
+        break;
+      case 'correct_subsequent': {
+        const note = this._lastCorrectNote;
+        text = `${note} 归位啦! ${ENCOURAGE[Math.floor(Math.random() * ENCOURAGE.length)]}`;
+        this._scheduleIdleNudge(14000, 'idle_keep_going');
+        break;
+      }
+      case 'wrong_drop_near':
+        text = this._lastWrongHint || '呀, 试试上面那个颜色一样的位置!';
+        this._scheduleIdleNudge(8000, 'idle_keep_going');
+        break;
+      case 'wrong_drop_far':
+        text = '不对哟~ 拖到上面那条五线谱的家 ✨';
+        this._scheduleIdleNudge(8000, 'idle_keep_going');
+        break;
+      case 'idle_keep_going':
+        text = '没关系! 试试别的鱼, 一条一条来~';
+        this._scheduleIdleNudge(12000, 'idle_hard');
+        break;
+      case 'idle_hard':
+        text = '先听一首钢琴曲怎么样? 试试底下的钢琴键吧! 🎹';
+        this._scheduleIdleNudge(20000, 'idle_give_up');
+        break;
+      case 'win':
+        // 单独的 win 遮罩接管, 不动 bubble
+        return;
+      default:
+        text = state;
+    }
+    this.say(text);
+    this.bubble.classList.remove('bubble--pulse');
+    void this.bubble.offsetWidth; // restart animation
+    this.bubble.classList.add('bubble--pulse');
+  }
+
+  _advanceHint(event) {
+    // 事件驱动的状态推进
+    switch (event) {
+      case 'first_tap':
+        // 先听完再引导拖动
+        this._hintTimer = setTimeout(() => this._enterHint('hint_drag'), 4500);
+        break;
+      case 'first_correct':
+        this._enterHint('first_correct');
+        break;
+      case 'subsequent_correct':
+        this._enterHint('correct_subsequent');
+        break;
+      default:
+        break;
+    }
+  }
+
+  _scheduleIdleNudge(afterMs, target) {
+    if (this._idleNudgeScheduled) return;
+    this._clearHintTimer();
+    this._hintTimer = setTimeout(() => {
+      // 仍没活动才会再推; 检查 placed 数对比即可 (避免重复)
+      const stillStuck = (
+        (target === 'idle_1' && !this.hasTappedFish) ||
+        (target === 'idle_drag' && !this.hasStartedDrag) ||
+        (target === 'idle_keep_going' && this.placed.size < NOTES.length) ||
+        (target === 'idle_hard')
+      );
+      if (stillStuck) {
+        this._idleNudgeScheduled = false;
+        this._enterHint(target);
+        return;
+      }
+      // 已推进, 不再 nudge
+    }, afterMs);
+    this._idleNudgeScheduled = true;
+  }
+
+  _placedOnText(noteId) {
+    const n = NOTES.find((x) => x.id === noteId);
+    return n ? n.solfege : '小鱼';
+  }
+
+  _lastWrongHint = '';
+  _lastCorrectNote = '';
+  _firstCorrectNote = null;
+
+  // ============================================================
   // 拖拽回调
   // ============================================================
 
   onFishDrop(fish, slotEl, accepted) {
     if (!this.gate) return;
+    this._markActivity();
     if (accepted && slotEl) {
       this.handleCorrect(fish, slotEl);
     } else {
-      this.handleWrong(fish);
+      this.handleWrong(fish, slotEl);
     }
   }
 
@@ -151,6 +312,9 @@ export class Game {
     const id = fish.dataset.id;
     if (this.placed.has(id)) return;
     this.placed.add(id);
+    this._lastCorrectNote = this._placedOnText(id);
+    const isFirst = this.firstCorrectNote === null || this.firstCorrectNote === undefined;
+    if (isFirst) this.firstCorrectNote = id;
 
     // 1) 计算 staff slot 中心在鱼池坐标系的位置
     const rect = slotEl.getBoundingClientRect();
@@ -191,10 +355,14 @@ export class Game {
         // 6) 鱼原地弹一下
         gsap.fromTo(fish, { scale: 0.85 }, { scale: 1.05, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out' });
 
-        // 7) 加星
+        // 7) 加星 (即时给 1 颗, 通关时再按 wrongCount 校正)
         this.addStar();
 
-        // 8) 检查通关
+        // 8) 推进引导气泡
+        if (isFirst) this._advanceHint('first_correct');
+        else this._advanceHint('subsequent_correct');
+
+        // 9) 检查通关
         if (this.placed.size === NOTES.length) {
           setTimeout(() => this.handleWin(), 600);
         }
@@ -202,7 +370,8 @@ export class Game {
     });
   }
 
-  handleWrong(fish) {
+  handleWrong(fish, slotEl) {
+    this.wrongCount++;
     try { this.audio.wrong(); } catch (_) {}
     if (this.staff) this.staff.clearHint();
     fish.classList.add('shake');
@@ -213,12 +382,54 @@ export class Game {
       duration: 0.55,
       ease: 'elastic.out(1, 0.5)',
     });
+
+    // 给针对性提示: 鱼的名字 + 它应该去的方向
+    const fishId = fish.dataset.id;
+    const fishNote = NOTES.find((n) => n.id === fishId);
+    if (slotEl) {
+      // 拖到错误 slot (但还是有点近) — 提示鱼名 + 哪个 slot 是它的家
+      this._lastWrongHint = `${fishNote ? fishNote.solfege : '这条鱼'} 的家在上面, 看看五线谱上的唱名哦~`;
+      this._enterHint('wrong_drop_near');
+    } else {
+      // 拖到空白区
+      this._lastWrongHint = '把鱼拖到上面五线谱的圆圈里~';
+      this._enterHint('wrong_drop_far');
+    }
+  }
+
+  // ============================================================
+  // v16: 星级计算
+  // ============================================================
+
+  _calcStars() {
+    if (this.wrongCount <= 0) return 3;
+    if (this.wrongCount <= 2) return 2;
+    if (this.wrongCount <= 5) return 1;
+    return 0;
+  }
+
+  /** 显式按星数覆盖 HUD 星 (通关瞬间调用) */
+  applyFinalStars() {
+    const stars = this._calcStars();
+    const starEls = document.querySelectorAll('#hud-stars .star');
+    starEls.forEach((el, i) => {
+      if (i < stars) {
+        el.textContent = '⭐';
+        el.classList.add('on');
+      } else {
+        el.textContent = '☆';
+        el.classList.remove('on');
+      }
+    });
+    return stars;
   }
 
   handleWin() {
     this.gate = false;
-    this.say('太棒了!你认识了 7 个音符!');
-    try { this.progress.markLevelComplete(1, NOTES.length); } catch (_) {}
+    this._clearHintTimer();
+
+    const earned = this.applyFinalStars();
+    try { this.progress.markLevelComplete(1, earned); } catch (_) {}
     try { this.kb.glowAll(); } catch (_) {}
     try { this.audio.playScale(['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4']); } catch (_) {}
     confetti({
@@ -227,7 +438,8 @@ export class Game {
       origin: { y: 0.55 },
       colors: ['#e63946', '#f4a261', '#ffc971', '#b5c99a', '#457b9d', '#9b5de5'],
     });
-    setTimeout(() => this.showWinOverlay(), 1800);
+
+    setTimeout(() => this.showWinOverlay(earned), 1800);
   }
 
   // ============================================================
@@ -245,21 +457,80 @@ export class Game {
     }
   }
 
-  showWinOverlay() {
+  showWinOverlay(stars) {
+    // 关掉已有 overlay
+    document.querySelectorAll('.overlay').forEach((el) => el.remove());
+
+    const starIcons = [0, 1, 2].map((i) =>
+      `<span class="win-star ${i < stars ? 'on' : ''}">${i < stars ? '⭐' : '☆'}</span>`
+    ).join('');
+
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
       <div class="overlay__card">
-        <h2 class="overlay__title">🎉 第一关完成!</h2>
-        <p class="overlay__text">你已经认识了 Do Re Mi Fa Sol La Si<br>准备好听更多声音了吗?</p>
-        <button class="btn-primary" id="next-btn">下一关 ›</button>
+        <div class="overlay__title">🎉 第一关完成!</div>
+        <div class="win-stars">${starIcons}</div>
+        <p class="overlay__text">你已经认识了 Do Re Mi Fa Sol La Si<br><small>${this._correctnessComment(stars)}</small></p>
+        <div class="overlay__btns">
+          <button class="btn-secondary" id="replay-btn">↻ 再玩一次</button>
+          <button class="btn-primary" id="next-btn">下一关 ›</button>
+        </div>
       </div>
     `;
     document.body.appendChild(overlay);
+
+    overlay.querySelector('#replay-btn').addEventListener('click', () => {
+      overlay.remove();
+      this.restartLevel();
+    });
     overlay.querySelector('#next-btn').addEventListener('click', () => {
       overlay.remove();
-      this.say('下一关马上来…');
+      this.say('第二关(听音找鱼)马上就到...');
+      // 占位: 等后续开发
     });
+  }
+
+  _correctnessComment(stars) {
+    if (stars === 3) return '全对! 你真是个钢琴小天才 ⭐';
+    if (stars === 2) return '不错! 错一点点, 离完美不远了~';
+    if (stars === 1) return '完成了! 多练几次就能满分啦~';
+    return '没关系, 再来一次一定行!';
+  }
+
+  /**
+   * 重玩 (v16 新增)
+   *  - 重置 staff + fish + bubbles + 星星
+   *  - 关闭任何 overlay
+   *  - 重新开始关卡逻辑 (不开开始遮罩, 让玩家立即进入)
+   */
+  restartLevel() {
+    // 清遮罩
+    document.querySelectorAll('.overlay').forEach((el) => el.remove());
+
+    // 状态重置
+    this.placed.clear();
+    this.wrongCount = 0;
+    this.hasTappedFish = false;
+    this.hasStartedDrag = false;
+    this._firstCorrectNote = null;
+    this._lastCorrectNote = '';
+    this._lastWrongHint = '';
+    this._clearHintTimer();
+    this._idleNudgeScheduled = false;
+
+    // 视觉重置
+    if (this.staff) this.staff.reset();
+    if (this.fishPool) this.fishPool.reset();
+
+    // HUD 星星先重置 (再靠后续放置点亮)
+    document.querySelectorAll('#hud-stars .star').forEach((el) => {
+      el.textContent = '☆';
+      el.classList.remove('on');
+    });
+
+    // 重新进入引导
+    this._beginLevel();
   }
 
   burst(x, y, color) {

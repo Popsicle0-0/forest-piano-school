@@ -769,3 +769,95 @@ input, textarea, select { font-size: 16px; }
 }
 /* 禁用图片拖动 — 但不能用在 svg, 否则 SVG 内的可点击元素全部失效! */
 img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
+
+/* ============================================
+   v16 — 关卡 1 体验优化
+   ============================================ */
+
+/* 引导气泡: 文案变化时轻微脉冲, 吸引注意 */
+.bubble--pulse {
+  animation: bubblePulse 700ms ease-out;
+}
+
+@keyframes bubblePulse {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.04); box-shadow: 0 0 0 6px rgba(255, 209, 102, 0.35), var(--shadow-paper-1), var(--shadow-paper-2); }
+  100% { transform: scale(1); box-shadow: var(--shadow-paper-1), var(--shadow-paper-2); }
+}
+
+/* 通关遮罩: 按钮组 (主+次) */
+.overlay__btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 次要按钮: 用于"再玩一次" */
+.btn-secondary {
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  background: var(--bg-paper);
+  color: var(--staff-strong);
+  border: 2px solid var(--staff-strong);
+  border-radius: var(--r-pill);
+  padding: 12px 28px;
+  cursor: pointer;
+  box-shadow: var(--shadow-paper-1);
+  transition: transform 120ms var(--ease-out-soft);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.btn-secondary:active {
+  transform: scale(0.95) translateY(1px);
+}
+
+/* 通关星星: 三颗, 亮起来的星星更立体 */
+.win-stars {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  font-size: 56px;
+  margin: 12px 0 16px;
+  line-height: 1;
+}
+.win-star {
+  display: inline-block;
+  opacity: 0.35;
+  filter: grayscale(0.6);
+  transition: transform 240ms var(--ease-bounce), opacity 240ms;
+}
+.win-star.on {
+  opacity: 1;
+  filter: none;
+  animation: winStarPop 600ms var(--ease-bounce) backwards;
+}
+.win-star.on:nth-child(1) { animation-delay: 0ms; }
+.win-star.on:nth-child(2) { animation-delay: 120ms; }
+.win-star.on:nth-child(3) { animation-delay: 240ms; }
+
+@keyframes winStarPop {
+  0%   { transform: scale(0.2) rotate(-30deg); opacity: 0; }
+  60%  { transform: scale(1.4) rotate(15deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* 通关遮罩小字 */
+.overlay__text small {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--text-sub);
+}
+
+/* 手机端缩小通关星星 + 按钮 */
+@media (max-width: 768px) {
+  .win-stars { font-size: 44px; gap: 10px; }
+  .overlay__btns { gap: 8px; }
+  .btn-secondary { font-size: 16px; padding: 10px 22px; }
+  .btn-primary { font-size: 16px; padding: 10px 22px; }
+  .overlay__text small { font-size: 13px; }
+}

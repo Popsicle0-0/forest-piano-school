@@ -7,7 +7,7 @@ import { Audio } from './systems/Audio.js';
 import { Progress } from './systems/Progress.js';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v15';
+const APP_VERSION = 'v16';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -51,8 +51,9 @@ function boot() {
   setTimeout(applyPhoneLayout, 500);
   setTimeout(applyPhoneLayout, 1500);
 
-  // ====== 右上角按钮: 声音 / 主页 ======
+  // ====== 右上角按钮: 声音 / 重玩 / 主页 ======
   const btnSound = document.getElementById('btn-sound');
+  const btnReplay = document.getElementById('btn-replay');
   const btnHome = document.getElementById('btn-home');
   if (btnSound) {
     btnSound.addEventListener('click', () => {
@@ -60,10 +61,16 @@ function boot() {
       btnSound.textContent = muted ? '🔇' : '🔊';
     });
   }
+  if (btnReplay) {
+    btnReplay.addEventListener('click', () => {
+      // 直接重玩, 无遮罩, 无 reload
+      try { game.restartLevel(); } catch (err) { console.warn('restart 失败:', err); }
+    });
+  }
   if (btnHome) {
     btnHome.addEventListener('click', () => {
-      // 重新开始 (回到开始遮罩)
-      if (confirm('确定要重新开始吗?')) {
+      // 回到开始遮罩
+      if (confirm('回到开始画面?')) {
         location.reload();
       }
     });
