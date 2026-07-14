@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#FFF8EC" />
+  <title>森林钢琴学校 🎹</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;700;900&family=ZCOOL+KuaiLe&display=swap"
+    rel="stylesheet"
+  />
+  <script type="module" crossorigin src="./assets/index-ohEYbuDr.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-T19LROWO.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 关卡 1 容器:由 main.js 动态挂载场景 -->
+    <header class="hud">
+      <div class="hud__stars" id="hud-stars">
+        <span class="star" data-i="1">☆</span>
+        <span class="star" data-i="2">☆</span>
+        <span class="star" data-i="3">☆</span>
+      </div>
+      <div class="hud__right">
+        <button class="hud__btn" id="btn-sound" aria-label="声音">🔊</button>
+        <button class="hud__btn" id="btn-help" aria-label="帮助">❓</button>
+        <button class="hud__btn" id="btn-home" aria-label="首页">⌂</button>
+      </div>
+    </header>
+
+    <main class="stage" id="stage">
+      <!-- 由 Game 动态填充: Background / Staff / PianoKeyboard / Fish 池 / Pip -->
+    </main>
+
+    <footer class="bubble" id="bubble">
+      <div class="bubble__avatar">🐤</div>
+      <div class="bubble__text" id="bubble-text">Pip 说:点我开始～</div>
+    </footer>
+  </div>
+
+</body>
+</html>
