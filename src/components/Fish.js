@@ -59,10 +59,48 @@ export class Fish {
     const colorDarker = shadeHex(color, -25);
     const colorLighter = shadeHex(color, 22);
 
+    // 每条鱼的"体色微调": 在原色基础上再向某个方向轻推,让 7 条 Do/Re/... 看起来颜色相近但不雷同
+    const tintDir = Math.floor(Math.random() * 3);   // 0=偏暖 1=偏冷 2=更亮
+    const tintAmt = (8 + Math.random() * 8).toFixed(0); // 8~15
+    const tintRgb = { r: 0, g: 0, b: 0 };
+    if (tintDir === 0) { tintRgb.r = +tintAmt; tintRgb.g = +Math.floor(tintAmt / 2); }
+    else if (tintDir === 1) { tintRgb.b = +tintAmt; tintRgb.g = +Math.floor(tintAmt / 2); }
+    else { tintRgb.r = +Math.floor(tintAmt / 2); tintRgb.g = +Math.floor(tintAmt / 2); tintRgb.b = +Math.floor(tintAmt / 2); }
+    const origMatch = (color || '#999999').replace('#', '').match(/.{2}/g);
+    let bodyColor = color;
+    if (origMatch) {
+      const [r0, g0, b0] = origMatch.map((h) => parseInt(h, 16));
+      bodyColor = '#' + [r0 + tintRgb.r, g0 + tintRgb.g, b0 + tintRgb.b]
+        .map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0'))
+        .join('');
+    }
+    const bodyDarker = shadeHex(bodyColor, -25);
+    const bodyLighter = shadeHex(bodyColor, 22);
+
+    // 鱼在水里游 → 画 1~2 颗身后小水泡 (浮到画面外结束)
+    const trailBubbleCount = Math.random() > 0.5 ? 2 : 1;
+    const trailBubbles = Array.from({ length: trailBubbleCount }).map((_, i) => {
+      const rad = (1.5 + Math.random() * 1.2).toFixed(1);
+      const x = -6 - i * 5;     // 在鱼身后
+      const y = 32 + (i % 2 === 0 ? 0 : 6);
+      const dur = (2.4 + Math.random() * 1.6).toFixed(2);
+      const begin = (Math.random() * 2).toFixed(2);
+      return `
+        <circle cx="${x}" cy="${y}" r="${rad}" fill="rgba(255,255,255,0.55)">
+          <animate attributeName="cy" from="${y}" to="${y - 18}" dur="${dur}s"
+                   begin="${begin}s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0;0.85;0" keyTimes="0;0.4;1"
+                   dur="${dur}s" begin="${begin}s" repeatCount="indefinite" />
+        </circle>`;
+    }).join('');
+
     this.el.innerHTML = `
       <svg xmlns="${SVG_NS}" viewBox="0 0 96 72"
            style="display: block; width: 100%; height: 100%; overflow: visible;">
         <g class="fish-body" transform="rotate(${rot} 48 36) scale(${scaleVar})">
+
+          <!-- 身后小水泡 trail (作为最底层,在身体后面) -->
+          ${trailBubbles}
 
           ${hasBubble ? `<!-- 思考泡泡 (60% 鱼有,大小也随机) -->
           <circle cx="78" cy="10" r="${bubbleR}" fill="rgba(255,255,255,0.85)"
@@ -71,17 +109,17 @@ export class Fish {
 
           <!-- 尾巴 (更圆润,带条纹) -->
           <path d="M2 36 Q8 20 22 28 L24 38 L24 42 L22 56 Q8 52 2 36 Z"
-                style="fill: ${colorDarker}; stroke: rgba(0,0,0,0.22); stroke-width: 0.6; stroke-linejoin: round;" />
+                style="fill: ${bodyDarker}; stroke: rgba(0,0,0,0.22); stroke-width: 0.6; stroke-linejoin: round;" />
           <path d="M14 28 L18 24 M14 52 L18 56"
                 style="stroke: rgba(0,0,0,0.32); stroke-width: 0.5; stroke-linecap: round; opacity: 0.55;" />
 
           <!-- 背鳍 (圆角三角帽) -->
           <path d="M36 18 Q44 4 52 18 Z"
-                style="fill: ${colorLighter}; stroke: rgba(0,0,0,0.18); stroke-width: 0.5; stroke-linejoin: round;" />
+                style="fill: ${bodyLighter}; stroke: rgba(0,0,0,0.18); stroke-width: 0.5; stroke-linejoin: round;" />
 
-          <!-- 身体 -->
+          <!-- 身体 (微调过的色) -->
           <ellipse cx="50" cy="38" rx="32" ry="22"
-                   style="fill: ${color}; stroke: rgba(0,0,0,0.22); stroke-width: 0.9;" />
+                   style="fill: ${bodyColor}; stroke: rgba(0,0,0,0.22); stroke-width: 0.9;" />
 
           <!-- 肚白高光 (大肚皮) -->
           <ellipse cx="50" cy="50" rx="22" ry="9" fill="rgba(255,255,255,0.42)" />

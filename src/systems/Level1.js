@@ -31,5 +31,9 @@ export default function startLevel1(game) {
     if (hudDots) hudDots.style.display = '';
     const btnReplay = document.getElementById('btn-replay');
     if (btnReplay) btnReplay.style.display = '';
+    // 清掉残留的 .targeting / .filling 高亮(防止跨关卡状态泄漏)
+    document.querySelectorAll('.staff-slot.targeting, .staff-slot.filling').forEach((el) => {
+      el.classList.remove('targeting', 'filling');
+    });
   };
 }

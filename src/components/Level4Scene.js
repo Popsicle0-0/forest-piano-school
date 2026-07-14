@@ -1,12 +1,16 @@
 /**
- * Level 4 场景: 水底小河 + 中央大鼓
+ * Level 4 场景: 水底小河 + 中央大鼓 + 鼓手 + 节奏提示
  *
  * 元素:
  *  - 暗色水下渐变背景 (深青 + 墨绿)
+ *  - 横向 "小河" SVG path (顶部), 多层波形 CSS 流动动画
  *  - 摇曳水草 (SVG path)
  *  - 河底小石头 (椭圆阴影)
+ *  - 鼓手 (小企鹅 + 鼓槌), 站在鼓上方
  *  - 中央大鼓 (鼓身 + 鼓面 + 金边 + X 形鼓面扣绳)
- *  - 节拍提示红环 (随节拍闪烁)
+ *  - 同心圆目标环 (持续呼吸, 节拍到达时同步闪光)
+ *  - 大型红色节拍提示圆 (200px 直径, 节拍到达时脉动)
+ *  - FX 层 (.level4-fx-layer): 用于 ripples / particles / +1/-1 浮动
  *
  * 节奏泡泡 (.level4-bubble) 是 Level4.js 创建的 DOM, 不归 Scene 管.
  */
@@ -24,6 +28,29 @@ export class Level4Scene {
     bg.innerHTML = `
       <svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice"
            xmlns="${SVG_NS}">
+        <!-- === 顶部小河 (河流动画) === -->
+        <g class="level4-river">
+          <!-- 河底柔光带 -->
+          <path class="level4-river-band"
+                d="M-40,200 L840,200 L840,250 L-40,250 Z"
+                fill="url(#level4RiverGrad)" />
+          <!-- 三条波纹 path, 不同速度 + 相位 -->
+          <path class="level4-river-wave level4-river-wave--1"
+                d="M-60,170 Q60,155 180,170 T420,170 T660,170 T900,170" />
+          <path class="level4-river-wave level4-river-wave--2"
+                d="M-60,190 Q80,180 200,195 T460,195 T700,195 T940,195" />
+          <path class="level4-river-wave level4-river-wave--3"
+                d="M-60,210 Q60,200 180,215 T420,215 T660,215 T900,215" />
+          <path class="level4-river-wave level4-river-wave--4"
+                d="M-60,235 Q90,225 220,238 T480,238 T720,238 T960,238" />
+          <defs>
+            <linearGradient id="level4RiverGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(120,200,235,0.30)" />
+              <stop offset="100%" stop-color="rgba(80,160,200,0.10)" />
+            </linearGradient>
+          </defs>
+        </g>
+
         <!-- 远景水草 -->
         <g class="level4-plants-far" opacity="0.55">
           <path class="level4-plant" d="M50,500 Q60,400 55,300 Q50,200 60,150" />
@@ -42,8 +69,33 @@ export class Level4Scene {
           <ellipse cx="380" cy="492" rx="22" ry="4" fill="rgba(0,0,0,0.35)" />
         </g>
 
-        <!-- 大鼓 (中央偏下). 外层 anchor 处理定位, 内层 wrap 处理点击动画 -->
+        <!-- === 大鼓锚点 (中央偏下) === -->
         <g class="level4-drum-anchor" transform="translate(400 340)">
+          <!-- 同心圆目标环 (持续呼吸 — cue 到达时高亮闪一次) -->
+          <circle class="level4-target-ring level4-target-ring--3" cx="0" cy="0" r="170"
+                  fill="none" stroke="rgba(255,82,82,0.18)" stroke-width="2" />
+          <circle class="level4-target-ring level4-target-ring--2" cx="0" cy="0" r="155"
+                  fill="none" stroke="rgba(255,82,82,0.28)" stroke-width="2" />
+          <circle class="level4-target-ring level4-target-ring--1" cx="0" cy="0" r="140"
+                  fill="none" stroke="rgba(255,82,82,0.40)" stroke-width="2.5" />
+
+          <!-- 鼓手小企鹅 (绘制在鼓之前, 被鼓覆盖; 只有头部从鼓上方探出) -->
+          <g class="level4-drum-character">
+            <!-- 企鹅身体 (鼓后隐藏) -->
+            <ellipse class="level4-drum-character-body" cx="0" cy="-90" rx="18" ry="22" fill="#23232f" />
+            <ellipse class="level4-drum-character-belly" cx="0" cy="-88" rx="11" ry="15" fill="#fff7df" />
+            <!-- 企鹅头部 (鼓面之上) -->
+            <circle class="level4-drum-character-head" cx="0" cy="-118" r="14" fill="#23232f" />
+            <!-- 眼睛 -->
+            <circle cx="-4.5" cy="-120" r="2.4" fill="#fff" />
+            <circle cx="4.5" cy="-120" r="2.4" fill="#fff" />
+            <circle cx="-4.5" cy="-119" r="1.2" fill="#1a1a1a" />
+            <circle cx="4.5" cy="-119" r="1.2" fill="#1a1a1a" />
+            <!-- 嘴 -->
+            <path d="M-2.5,-114 L2.5,-114 L0,-109 Z" fill="#ff9933" />
+          </g>
+
+          <!-- 大鼓本体 -->
           <g class="level4-drum-wrap">
             <!-- 鼓底 (椭圆阴影) -->
             <ellipse cx="0" cy="65" rx="115" ry="14" fill="rgba(0,0,0,0.45)" />
@@ -77,11 +129,31 @@ export class Level4Scene {
             <!-- 鼓面文字 "咚!" -->
             <text x="0" y="-40" text-anchor="middle" class="level4-drum-text">咚</text>
           </g>
+
+          <!-- 鼓手鼓槌 (绘制在鼓之后, 像真在敲鼓) -->
+          <g class="level4-drum-arms">
+            <!-- 左臂 -->
+            <line class="level4-drum-stick level4-drum-stick--left"
+                  x1="-10" y1="-110" x2="-45" y2="-55"
+                  stroke="#a07050" stroke-width="3.5" stroke-linecap="round" />
+            <circle class="level4-drum-stick level4-drum-stick--left"
+                    cx="-45" cy="-55" r="4" fill="#fff8dc" />
+            <!-- 右臂 -->
+            <line class="level4-drum-stick level4-drum-stick--right"
+                  x1="10" y1="-110" x2="45" y2="-55"
+                  stroke="#a07050" stroke-width="3.5" stroke-linecap="round" />
+            <circle class="level4-drum-stick level4-drum-stick--right"
+                    cx="45" cy="-55" r="4" fill="#fff8dc" />
+          </g>
+
+          <!-- 大型节拍提示圆 (200px 直径, 默认隐藏) -->
+          <circle class="level4-drum-cue-large" cx="0" cy="0" r="100"
+                  fill="none" stroke="#ff5252" stroke-width="7" opacity="0" />
         </g>
 
-        <!-- 节拍提示红环 (中央鼓面上方, 与 anchor 同位置) -->
-        <g class="level4-cue-anchor" transform="translate(400 295)">
-          <circle class="level4-beat-cue" cx="0" cy="0" r="65"
+        <!-- 节拍提示小环 (顶部保留, 由 JS 按需显示) -->
+        <g class="level4-cue-anchor" transform="translate(400 235)">
+          <circle class="level4-beat-cue" cx="0" cy="0" r="22"
                   fill="none" stroke="#ff5252" stroke-width="5" opacity="0" />
         </g>
 
@@ -108,9 +180,15 @@ export class Level4Scene {
     `;
     this.stage.appendChild(bg);
     this.background = bg;
+
+    // FX 层 (DOM 元素, 用于 ripples / particles / 浮动分数)
+    const fx = document.createElement('div');
+    fx.className = 'level4-fx-layer';
+    this.stage.appendChild(fx);
+    this.fxLayer = fx;
   }
 
-  /** 查找节拍提示红环 DOM 引用 */
+  /** 查找节拍提示小环 DOM 引用 (保留旧 API) */
   getBeatCue() {
     return this.stage ? this.stage.querySelector('.level4-beat-cue') : null;
   }
@@ -120,10 +198,40 @@ export class Level4Scene {
     return this.stage ? this.stage.querySelector('.level4-drum-wrap') : null;
   }
 
+  /** 大鼓锚点 (用于目标环 / cue-large 引用) */
+  getDrumAnchor() {
+    return this.stage ? this.stage.querySelector('.level4-drum-anchor') : null;
+  }
+
+  /** 大型节拍提示圆 */
+  getCueLarge() {
+    return this.stage ? this.stage.querySelector('.level4-drum-cue-large') : null;
+  }
+
+  /** FX 层 (ripples / particles / 分数浮动) */
+  getFxLayer() {
+    return this.fxLayer || null;
+  }
+
+  /** 获取鼓中心的屏幕坐标 (含 viewport 偏移) — 用于在 drum 周围 spawn DOM FX */
+  getDrumScreenCenter() {
+    const drum = this.getDrum();
+    if (!drum) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const rect = drum.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  }
+
   teardown() {
     if (this.background && this.background.parentNode) {
       this.background.parentNode.removeChild(this.background);
     }
     this.background = null;
+    if (this.fxLayer && this.fxLayer.parentNode) {
+      this.fxLayer.parentNode.removeChild(this.fxLayer);
+    }
+    this.fxLayer = null;
   }
 }

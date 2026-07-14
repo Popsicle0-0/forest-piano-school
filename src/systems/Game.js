@@ -40,7 +40,7 @@ if (typeof window !== 'undefined') {
 import { Background } from '../components/Background.js';
 import { Pip } from '../components/Pip.js';
 import { LevelMap } from '../components/LevelMap.js';
-import confetti from 'canvas-confetti';
+import particles from '../components/Particles.js';
 import { gsap } from 'gsap';
 
 /** C 大调 7 个白键的元数据 (color 用真实 hex, confetti 需要) */
@@ -61,6 +61,57 @@ const ENCOURAGE = [
   '加油加油!',
   '马上就完成了!',
 ];
+
+// 给鼓励文案 + 当前鱼名 + 剩余数量,组合更多变化 (后续正确提示用)
+function buildEncourageText(note, placed, total, wrongCount) {
+  const enc = ENCOURAGE[Math.floor(Math.random() * ENCOURAGE.length)];
+  const remaining = Math.max(0, total - placed);
+  // 三种模板风格轮换 — 更自然的对话感
+  const variants = [
+    `${note} 归位啦! ${enc} 还有 ${remaining} 条~`,
+    `${note} 找到家啦! 🎉 还差 ${remaining} 条就胜利~`,
+    `耶! ${note} 也安顿好了~ 再来 ${remaining} 条!`,
+  ];
+  // 错得多时给点安抚
+  if (wrongCount >= 3) {
+    variants.push(`没关系, ${note} 归位啦! 还剩 ${remaining} 条, 慢慢来~`);
+    variants.push(`慢慢来, ${note} 已经回家了! 还有 ${remaining} 条小鱼需要帮忙~`);
+  }
+  // 接近胜利
+  if (remaining === 1) {
+    variants.push(`${note} 也到家啦! 只剩最后 1 条小鱼咯! ⭐`);
+  } else if (remaining === 2) {
+    variants.push(`${note} 找到家啦! 再坚持一下, 还有 2 条~`);
+  }
+  return variants[Math.floor(Math.random() * variants.length)];
+}
+
+// 上下文提示:根据当前未归位鱼 + 错误数,给出贴合"卡住"状态的建议
+function buildIdleHint(remainingNotes, wrongCount) {
+  if (!remainingNotes || remainingNotes.length === 0) return '试试别的鱼, 一条一条来~';
+  // 随机挑一条还没归位的鱼给提示
+  const pickIdx = Math.floor(Math.random() * remainingNotes.length);
+  const note = remainingNotes[pickIdx];
+  const slots = ['最下面那条加线', '加线上面那个间', '最下面那条线 (si 隔壁)',
+    '往上数第 2 条线', '往中间数的那个间', '中间那条线 (la 隔壁)', '中间上面那条线'];
+  // 简单按 id 索引 — 与 Staff POSITIONS 一致 (mi=0, fa=1, sol=2, la=3, si=4, re=5, do=6)
+  const order = ['mi', 'fa', 'sol', 'la', 'si', 're', 'do'];
+  const slotIdx = order.indexOf(note.id);
+  const slotHint = slotIdx >= 0 ? slots[slotIdx] : '五线谱上的位置';
+
+  // 收集一些安慰/鼓励模板
+  const tips = [
+    `试试把 ${note.solfege} 拖到 ${slotHint}~`,
+    `${note.solfege} 的家在 ${slotHint} 哦~ 🌟`,
+    `这条 ${note.solfege} 小鱼呢? 它的家在 ${slotHint}!`,
+    `${note.solfege} 的家在 ${slotHint} ✨ 帮它找找~`,
+  ];
+  if (wrongCount >= 4) {
+    tips.push(`别着急~ 先听 ${note.solfege} 的声音, 再把它拖到 ${slotHint} 上哦~`);
+    tips.push(`深呼吸! 把 ${note.solfege} 小心地拖到 ${slotHint} ✨`);
+  }
+  return tips[Math.floor(Math.random() * tips.length)];
+}
 
 export class Game {
   constructor({ stageEl, bubbleEl, progress, audio }) {
@@ -166,8 +217,17 @@ export class Game {
     };
     this.fishPool.onDragMove = (_fish, slotEl) => {
       this._markActivity();
-      if (slotEl && this.staff) this.staff.showHint(slotEl.dataset.id);
-      else if (this.staff) this.staff.clearHint();
+      if (!this.staff) return;
+      if (slotEl) {
+        const id = slotEl.dataset.id;
+        // targeting 比 hint 更显眼: 把对应 slot 设成 .targeting
+        this.staff.setTarget(id);
+        // 兼容保留 .hint (旧 CSS 还能动)
+        this.staff.showHint(id);
+      } else {
+        this.staff.clearTarget();
+        this.staff.clearHint();
+      }
     };
     this.fishPool.onTap = (fish) => {
       this._markActivity();
@@ -329,12 +389,7 @@ export class Game {
     try { this.progress.markLevelComplete(2, stars); } catch (_) {}
     try { this.audio.playScale(['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4']); } catch (_) {}
     try {
-      confetti({
-        particleCount: 140,
-        spread: 80,
-        origin: { y: 0.55 },
-        colors: ['#e63946', '#f4a261', '#ffc971', '#b5c99a', '#457b9d', '#9b5de5'],
-      });
+      particles.celebrate();
     } catch (_) {}
     setTimeout(() => this.showWinOverlay(stars, 2), 1200);
   }
@@ -427,32 +482,62 @@ export class Game {
         text = '试试长按这条鱼, 拖到上面五线谱 Do 的位置~';
         this._scheduleIdleNudge(10000, 'idle_drag');
         break;
-      case 'first_correct':
-        text = this._placedOnText(this.firstCorrectNote) + ' 找到了家! 还有 ' + (NOTES.length - 1) + ' 条要帮~';
+      case 'first_correct': {
+        const note = this._placedOnText(this.firstCorrectNote);
+        const remaining = NOTES.length - 1;
+        const starters = [
+          `${note} 找到家啦! 还有 ${remaining} 个要帮~`,
+          `耶! ${note} 归位! 🎉 还有 ${remaining} 条小鱼等着你呢~`,
+          `真棒! ${note} 已经回到五线谱啦! 还差 ${remaining} 条~`,
+        ];
+        text = starters[Math.floor(Math.random() * starters.length)];
         this._scheduleIdleNudge(12000, 'idle_keep_going');
         break;
+      }
       case 'correct_subsequent': {
         const note = this._lastCorrectNote;
-        text = `${note} 归位啦! ${ENCOURAGE[Math.floor(Math.random() * ENCOURAGE.length)]}`;
+        text = buildEncourageText(note, this.placed.size, NOTES.length, this.wrongCount);
         this._scheduleIdleNudge(14000, 'idle_keep_going');
         break;
       }
-      case 'wrong_drop_near':
-        text = this._lastWrongHint || '呀, 试试上面那个颜色一样的位置!';
+      case 'wrong_drop_near': {
+        const base = this._lastWrongHint || '呀, 试试上面那个颜色一样的位置!';
+        // 偶尔补一句鼓励,缓解挫败感
+        const wrap = this.wrongCount >= 2
+          ? `没关系的! ${base}`
+          : base;
+        text = wrap;
         this._scheduleIdleNudge(8000, 'idle_keep_going');
         break;
-      case 'wrong_drop_far':
-        text = '不对哟~ 拖到上面那条五线谱的家 ✨';
+      }
+      case 'wrong_drop_far': {
+        const tips = [
+          '不对哟~ 拖到上面那条五线谱的家 ✨',
+          '鱼还在游呢! 帮它回到上面五线谱的家吧~',
+          '呀, 再往上一点! 五线谱在上面等着呢~',
+        ];
+        text = tips[Math.floor(Math.random() * tips.length)];
         this._scheduleIdleNudge(8000, 'idle_keep_going');
         break;
-      case 'idle_keep_going':
-        text = '没关系! 试试别的鱼, 一条一条来~';
+      }
+      case 'idle_keep_going': {
+        // 卡住时,根据还没归位的鱼给具体提示
+        const remainingNotes = NOTES.filter((n) => !this.placed.has(n.id));
+        text = buildIdleHint(remainingNotes, this.wrongCount);
         this._scheduleIdleNudge(12000, 'idle_hard');
         break;
-      case 'idle_hard':
-        text = '先听一首钢琴曲怎么样? 试试底下的钢琴键吧! 🎹';
+      }
+      case 'idle_hard': {
+        // 已经引导多次仍未动 → 给完全不同的备用建议
+        const tired = [
+          '先听一首钢琴曲怎么样? 试试底下的钢琴键吧! 🎹',
+          '需要休息吗? 听听其它音乐, 等下再来! 🎵',
+          '先随便摸鱼听听声音, 找找感觉再继续! 🐟',
+        ];
+        text = tired[Math.floor(Math.random() * tired.length)];
         this._scheduleIdleNudge(20000, 'idle_give_up');
         break;
+      }
       case 'win':
         // 单独的 win 遮罩接管, 不动 bubble
         return;
@@ -556,10 +641,14 @@ export class Game {
       duration: 0.5,
       ease: 'back.out(1.7)',
       onComplete: () => {
-        // 3) 五线谱占位点填色
+        // 3) flash fill 动画 (slot 闪一下再正式填色)
+        try { this.staff.flashFill(id); } catch (_) {}
+        // 4) 五线谱占位点填色
         try { this.staff.fillNote(id); } catch (_) {}
+        // 拖动结束,清除 targeting 高亮
+        try { this.staff.clearTarget(); } catch (_) {}
 
-        // 4) 找到对应的钢琴键(同 data-id),让它发光 + 弹音
+        // 5) 找到对应的钢琴键(同 data-id),让它发光 + 弹音
         const matchingKey = this.kb && this.kb.svg
           ? this.kb.svg.querySelector(`.key--white[data-id="${id}"]`)
           : null;
@@ -569,9 +658,20 @@ export class Game {
         }
         try { this.audio.correct(); } catch (_) {}
 
-        // 5) 粒子 (用真实 hex 色, 不用 var()) — 围绕 staff slot
+        // 6) 8 粒彩色碎纸从 slot 中心喷出 (手写 spec)
         const colorHex = (NOTES.find((n) => n.id === id) || {}).color || '#ffc971';
         this.burst(rect.left + rect.width / 2, rect.top + rect.height / 2, colorHex);
+        // 第二圈: 8 颗白/金碎纸
+        try {
+          particles.burst({
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+            color: '#fff8ec',
+            count: 10,
+            spread: 70,
+            startVelocity: 18,
+          });
+        } catch (_) {}
 
         // 标记对应琴键 (永久)
         try { this.kb.markPlaced(id, colorHex); } catch (_) {}
@@ -616,7 +716,10 @@ export class Game {
   handleWrong(fish, slotEl) {
     this.wrongCount++;
     try { this.audio.wrong(); } catch (_) {}
-    if (this.staff) this.staff.clearHint();
+    if (this.staff) {
+      this.staff.clearHint();
+      this.staff.clearTarget();
+    }
     fish.classList.add('shake');
     setTimeout(() => fish.classList.remove('shake'), 400);
     gsap.to(fish, {
@@ -664,12 +767,7 @@ export class Game {
     try { this.progress.markLevelComplete(1, earned); } catch (_) {}
     try { this.kb.glowAll(); } catch (_) {}
     try { this.audio.playScale(['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4']); } catch (_) {}
-    confetti({
-      particleCount: 140,
-      spread: 80,
-      origin: { y: 0.55 },
-      colors: ['#e63946', '#f4a261', '#ffc971', '#b5c99a', '#457b9d', '#9b5de5'],
-    });
+    particles.celebrate();
 
     setTimeout(() => this.showWinOverlay(earned, 1), 1800);
   }
@@ -860,16 +958,7 @@ export class Game {
   }
 
   burst(x, y, color) {
-    confetti({
-      particleCount: 18,
-      spread: 50,
-      startVelocity: 22,
-      ticks: 60,
-      origin: { x: x / window.innerWidth, y: y / window.innerHeight },
-      colors: [color, '#fff8ec', '#ffc971'],
-      shapes: ['circle'],
-      scalar: 0.7,
-    });
+    particles.burst({ x, y, color });
   }
 
   _flashScreen() {

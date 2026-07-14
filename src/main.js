@@ -7,9 +7,12 @@ import { Audio } from './systems/Audio.js';
 import { BGM } from './systems/BGM.js';
 import { Progress } from './systems/Progress.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
+import { Tutorial } from './components/Tutorial.js';
+
+const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.1';
+const APP_VERSION = 'v18.2';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -137,6 +140,33 @@ function boot() {
         wall.show();
       }).catch((err) => console.warn('[achievements] 加载失败:', err));
     });
+  }
+
+  // ====== v18: 教程 — 📖 帮助按钮 + 首次自动弹出 ======
+  // HUD 按钮: 让玩家可以随时回顾玩法
+  if (!document.getElementById('btn-help')) {
+    const btnHelp = document.createElement('button');
+    btnHelp.className = 'hud__btn';
+    btnHelp.id = 'btn-help';
+    btnHelp.setAttribute('aria-label', '帮助');
+    btnHelp.setAttribute('title', '教程');
+    btnHelp.textContent = '📖';
+    document.querySelector('.hud__right')?.appendChild(btnHelp);
+    btnHelp.addEventListener('click', () => {
+      const tut = new Tutorial(document.body, { onDone: () => {} });
+      tut.show();
+    });
+  }
+
+  // 首次玩家: 启动后 1200ms 自动弹出教程
+  if (!localStorage.getItem(TUTORIAL_FLAG)) {
+    setTimeout(() => {
+      const tut = new Tutorial(document.body, {
+        isFirstTime: true,
+        onDone: () => localStorage.setItem(TUTORIAL_FLAG, '1'),
+      });
+      tut.show();
+    }, 1200);
   }
 
   // 全局错误兜底

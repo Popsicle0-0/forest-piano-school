@@ -156,11 +156,46 @@ export class Staff {
     });
   }
 
+  /**
+   * 把"鱼正被拖着去对应位置"的 slot 高亮成 .targeting。
+   * 同时只允许一个 slot 处于此状态;已 filled 的 slot 跳过。
+   * @param {string|null} id 鱼 ID, null 表示清空
+   */
+  setTarget(id) {
+    this.clearTarget();
+    if (!id) return;
+    const slot = this.slots.get(id);
+    if (!slot || this.filled.has(id)) return;
+    slot.classList.add('targeting');
+  }
+
+  /** 清除所有 .targeting 高亮 (拖动结束时调用) */
+  clearTarget() {
+    this.svg.querySelectorAll('.staff-slot.targeting').forEach((s) => {
+      s.classList.remove('targeting');
+    });
+  }
+
+  /**
+   * 让正确的 slot 闪一下"被填入"的动画。
+   * 内部延时移除 .filling 类,推荐 700ms 后调用 fillNote()
+   * @param {string} id
+   */
+  flashFill(id) {
+    const slot = this.slots.get(id);
+    if (!slot) return;
+    slot.classList.add('filling');
+    // 安全兜底 (防止外部忘记手动清除)
+    setTimeout(() => {
+      try { slot.classList.remove('filling'); } catch (_) {}
+    }, 900);
+  }
+
   /** 重置整个 staff(用于重玩) */
   reset() {
     this.filled.clear();
     this.svg.querySelectorAll('.staff-slot').forEach((s) => {
-      s.classList.remove('filled', 'hint');
+      s.classList.remove('filled', 'hint', 'targeting', 'filling');
       const dot = s.querySelector('.staff__dot');
       if (dot) {
         dot.classList.add('empty');
