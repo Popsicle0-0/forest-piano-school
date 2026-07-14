@@ -5,3 +5,4 @@ node_modules
 .cache
 .env.local
 .claude/
+docs/CREDENTIALS.md
