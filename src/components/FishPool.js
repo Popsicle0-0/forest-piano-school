@@ -98,12 +98,15 @@ export class FishPool {
       return;
     }
 
-    const usableW = rect.width - 2 * POOL_PAD_X;
-    const slots = this.notes.length;
-    const slotW = usableW / slots;
-    const baseY = rect.height * 0.58; // 略偏中下,看起来像水里
+    // 打乱 notes 顺序: 鱼和音的对应关系每次开局都随机
+    // (这样每次重玩 Do 不一定在同一个角)
+    const shuffled = [...this.notes];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
 
-    this.notes.forEach((note, i) => {
+    shuffled.forEach((note) => {
       const wrap = document.createElement('div');
       wrap.className = 'fish';
       wrap.dataset.id = note.id;
@@ -117,14 +120,14 @@ export class FishPool {
       wrap.style.userSelect = 'none';
       wrap.style.webkitTapHighlightColor = 'transparent';
 
-      // 横向均匀分布 + 抖动 (避免太规整)
-      const centerX = POOL_PAD_X + slotW * (i + 0.5)
-        + (Math.random() - 0.5) * slotW * 0.30;
-      const centerY = baseY + (Math.random() - 0.5) * rect.height * 0.32;
-      const left = Math.max(POOL_PAD_X, Math.min(rect.width - FISH_SLOT_W - POOL_PAD_X,
-        centerX - FISH_SLOT_W / 2));
-      const top = Math.max(8, Math.min(rect.height - FISH_SLOT_H - 8,
-        centerY - FISH_SLOT_H / 2));
+      // 完全随机散布 — 左右上下都在可用区域里均匀取
+      // 鱼可能重叠, 但孩子照样可以单点每个
+      const padL = POOL_PAD_X;
+      const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
+      const padT = 8;
+      const padB = rect.height - 8 - FISH_SLOT_H;
+      const left = padL + Math.random() * Math.max(1, padR - padL);
+      const top = padT + Math.random() * Math.max(1, padB - padT);
       wrap.style.left = `${left}px`;
       wrap.style.top = `${top}px`;
       wrap.style.width = `${FISH_SLOT_W}px`;
@@ -180,6 +183,7 @@ export class FishPool {
         originalLeft: left,
         originalTop: top,
         rot,
+        locked: false,           // v17: 正确放置后设为 true, 不能拖
       };
       this.fishes.push(fish);
       this._bindDrag(fish);
@@ -200,6 +204,8 @@ export class FishPool {
     let totalMove = 0;
 
     const onPointerDown = (e) => {
+      // v17: 已正确放置的鱼锁定, 不让再拖
+      if (fish.locked) return;
       if (activePointer !== null) return; // 单鱼只接一个触点
       // 鼠标: 只接受左键
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -348,6 +354,39 @@ export class FishPool {
   // 入场动画 (GSAP)
   // ============================================================
 
+  /**
+   * v17: 锁定一条鱼 (正确放置后调用), 它再不能拖动也不能点
+   * 通过 CSS .fish--locked (pointer-events:none) 实现
+   * @param {string} id - 'do'|'re'|...
+   */
+  lockFish(id) {
+    const fish = this.fishes.find((f) => f.note.id === id);
+    if (!fish) return;
+    fish.locked = true;
+    fish.el.classList.add('fish--locked');
+  }
+
+  /**
+   * v17: 解除所有鱼的锁定 (重玩时调用)
+   */
+  unlockAll() {
+    this.fishes.forEach((fish) => {
+      fish.locked = false;
+      fish.el.classList.remove('fish--locked');
+      // 顺手清掉之前的拖拽/dragging 残留
+      fish.el.classList.remove('dragging', 'shake');
+      fish.el.style.position = '';
+      fish.el.style.left = `${fish.originalLeft}px`;
+      fish.el.style.top = `${fish.originalTop}px`;
+      fish.el.style.right = '';
+      fish.el.style.bottom = '';
+      fish.el.style.margin = '';
+      fish.el.style.transform = '';
+      fish.inner.style.animationPlayState = '';
+    });
+  }
+
+
   intro() {
     const start = () => {
       if (this.fishes.length < this.notes.length) {
@@ -374,21 +413,14 @@ export class FishPool {
   }
 
   /**
-   * 重置: 把鱼送回初始位置 + 重新弹入
+   * 重置: 把鱼送回初始位置 + 重新弹入 + 解锁所有鱼
    * (重玩时 Game.js 调用)
    */
   reset() {
     if (!this.pool) return;
+    // v17: 重玩时一并解除锁定 (单一来源, Game.js 不必单独 unlockAll)
+    this.unlockAll();
     this.fishes.forEach((fish) => {
-      fish.el.classList.remove('dragging', 'shake');
-      fish.el.style.position = '';
-      fish.el.style.left = `${fish.originalLeft}px`;
-      fish.el.style.top = `${fish.originalTop}px`;
-      fish.el.style.right = '';
-      fish.el.style.bottom = '';
-      fish.el.style.margin = '';
-      fish.el.style.transform = '';
-      fish.inner.style.animationPlayState = '';
       // 重新入场动画 (用 fromTo, y 从下方偏移开始)
       gsap.fromTo(
         fish.el,

@@ -1,7 +1,7 @@
 /**
  * 五线谱组件
  * - viewBox 0 0 1024 220
- * - 5 条主线 x:120~984;Do 的下方第 1 加线画成虚线,长度 60px
+ * - 5 条主线 x:80~1004;Do 的下方第 1 加线画成虚线,长度 60px
  * - 7 个 <g class="staff-slot"> 沿 x = 200 + i*100 均匀分布
  *   - mi @ y=80 (line 1), sol @ y=100 (line 2), si @ y=120 (line 3)
  *   - fa @ y=90 (space 1), la @ y=110 (space 2)
@@ -53,7 +53,7 @@ export class Staff {
     const lines = [0, 1, 2, 3, 4]
       .map(
         (i) =>
-          `<line class="staff__line" x1="120" y1="${STAFF_TOP + i * LINE_GAP}" x2="${W - 40}" y2="${STAFF_TOP + i * LINE_GAP}"/>`
+          `<line class="staff__line" x1="80" y1="${STAFF_TOP + i * LINE_GAP}" x2="${W - 20}" y2="${STAFF_TOP + i * LINE_GAP}"/>`
       )
       .join('');
 
@@ -84,7 +84,7 @@ export class Staff {
       <svg class="staff" xmlns="${SVG_NS}" viewBox="0 0 ${W} ${H}"
            preserveAspectRatio="xMidYMid meet" aria-label="五线谱">
         <!-- 高音谱号 -->
-        <text class="staff__clef" x="40" y="140" dominant-baseline="middle">𝄞</text>
+        <text class="staff__clef" x="105" y="140" dominant-baseline="middle">𝄞</text>
 
         <!-- 5 条主线 -->
         ${lines}

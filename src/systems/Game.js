@@ -134,15 +134,9 @@ export class Game {
       started = true;
       if (e) e.preventDefault();
 
-      // iOS PWA 音频解锁三连击 (全在 gesture handler 同步触发):
-      // 1) sync resume kick-off
-      // 2) HTMLAudio 暖通 iOS media session
-      // 3) unlockOnGesture 内部做静音 oscillator + 测试音 (async 是 OK 的, 已 unlocked)
-      try { this.audio._resumeWebAudio(); } catch (_) {}
-      try { this.audio._warmUpHtmlAudio(); } catch (_) {}
-      this.audio.unlockOnGesture().catch((err) => console.warn(err));
-
       // 关键: 不 await 音频加载! 立刻进游戏, 钢琴采样在后台慢慢加载
+      // unlockOnGesture 内部用合成器做 fallback, 立刻能出声
+      this.audio.unlockOnGesture().catch((err) => console.warn(err));
       overlay.remove();
       this._beginLevel();
     };
@@ -318,6 +312,8 @@ export class Game {
     const id = fish.dataset.id;
     if (this.placed.has(id)) return;
     this.placed.add(id);
+    // v17: 正确放置后锁定这条鱼 — 不能再拖, 也不能再点
+    try { this.fishPool.lockFish(id); } catch (_) {}
     this._lastCorrectNote = this._placedOnText(id);
     const isFirst = this.firstCorrectNote === null || this.firstCorrectNote === undefined;
     if (isFirst) this.firstCorrectNote = id;

@@ -215,6 +215,19 @@ body::before {
   z-index: 1000;
 }
 
+/* v17: 已正确放置的鱼 — 不可拖不可点, 视觉变淡 */
+.fish-pool .fish.fish--locked {
+  opacity: 0.65;
+  filter: grayscale(0.4);
+  pointer-events: none !important; /* 关键: 让 click/pointer 一概穿透 */
+  cursor: default;
+  animation: none !important;
+}
+
+.fish-pool .fish.fish--locked .fish-inner {
+  animation: none !important; /* 停掉 fishFloat 浮动 */
+}
+
 /* === Pip 鸟 === */
 .pip {
   position: absolute;
