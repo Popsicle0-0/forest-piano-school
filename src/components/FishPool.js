@@ -12,8 +12,8 @@ import { gsap } from 'gsap';
 const SNAP_RADIUS = 280;
 const POOL_PAD_X = 16;
 // 单条鱼的近似可视尺寸 (Fish.js 自适应,这里只用于布局估算)
-const FISH_SLOT_W = 78;
-const FISH_SLOT_H = 78;
+const FISH_SLOT_W = 96;  // was 78 — match Fish.js visual width (更大点击区)
+const FISH_SLOT_H = 76;  // was 78 — match Fish.js visual height + 4px margin
 
 const STYLE_ID = 'forest-piano-fishpool-keyframes';
 
@@ -68,7 +68,7 @@ export class FishPool {
     this.onDragMove = null;   // (fishEl, nearestSlotEl|null) => void  可选 (位置提示)
     this.onTap = null;        // (fishEl) => void  可选 (单击听声)
     this._lastHoveredSlot = null;
-    this.TAP_THRESHOLD = 8;   // 移动 < 8px 视为单击
+    this.TAP_THRESHOLD = 12;  // 移动 < 12px 视为单击 (iOS 手指精度不为 0, 放宽更友好)
 
     this._renderPool();
 
@@ -106,6 +106,27 @@ export class FishPool {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
+    // Poisson-disc-like: 每条新鱼至少 MIN_DIST 远离已放置的鱼
+    const padL = POOL_PAD_X;
+    const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
+    const padT = 8;
+    const padB = rect.height - 8 - FISH_SLOT_H;
+    const MIN_DIST = 28;        // px, 鱼中心点之间的最小间距
+    const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
+    const MAX_TRIES_PER_FISH = 60;
+    const placedCenters = [];
+
+    // Helper: candidate (cx, cy) 距所有已放置鱼是否 >= MIN_DIST
+    function tryPlace(cx, cy) {
+      for (let i = 0; i < placedCenters.length; i++) {
+        const c = placedCenters[i];
+        const dx = c.x - cx;
+        const dy = c.y - cy;
+        if (dx * dx + dy * dy < MIN_DIST_SQ) return false;
+      }
+      return true;
+    }
+
     shuffled.forEach((note) => {
       const wrap = document.createElement('div');
       wrap.className = 'fish';
@@ -115,23 +136,65 @@ export class FishPool {
       wrap.dataset.pitch = note.pitch;
 
       // iPad 触屏保险 (CSS 已经覆盖,这里再 inline 一次)
-      wrap.style.touchAction = 'none';
+      wrap.style.touchAction = 'manipulation';
       wrap.style.webkitUserSelect = 'none';
       wrap.style.userSelect = 'none';
       wrap.style.webkitTapHighlightColor = 'transparent';
 
-      // 完全随机散布 — 左右上下都在可用区域里均匀取
-      // 鱼可能重叠, 但孩子照样可以单点每个
-      const padL = POOL_PAD_X;
-      const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
-      const padT = 8;
-      const padB = rect.height - 8 - FISH_SLOT_H;
-      const left = padL + Math.random() * Math.max(1, padR - padL);
-      const top = padT + Math.random() * Math.max(1, padB - padT);
+      // 随机中心点范围 (注意这里算的是 CENTER)
+      const cxMin = padL + FISH_SLOT_W / 2;
+      const cxMax = padR - FISH_SLOT_W / 2;
+      const cyMin = padT + FISH_SLOT_H / 2;
+      const cyMax = padB - FISH_SLOT_H / 2;
+      const cxRange = Math.max(1, cxMax - cxMin);
+      const cyRange = Math.max(1, cyMax - cyMin);
+
+      // Phase 1: 随机采样直到满足最小间距
+      let cx = 0, cy = 0, found = false;
+      for (let t = 0; t < MAX_TRIES_PER_FISH; t++) {
+        const tcx = cxMin + Math.random() * cxRange;
+        const tcy = cyMin + Math.random() * cyRange;
+        if (tryPlace(tcx, tcy)) {
+          cx = tcx;
+          cy = tcy;
+          found = true;
+          break;
+        }
+      }
+
+      // Phase 2: 实在找不到,挑 30 个候选里"最不挤"的那个位置
+      if (!found) {
+        let bestDist = -Infinity;
+        let bestCx = cxMin;
+        let bestCy = cyMin;
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const tcx = cxMin + Math.random() * cxRange;
+          const tcy = cyMin + Math.random() * cyRange;
+          let minD = Infinity;
+          for (let i = 0; i < placedCenters.length; i++) {
+            const c = placedCenters[i];
+            const dx = c.x - tcx;
+            const dy = c.y - tcy;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < minD) minD = d;
+          }
+          if (minD > bestDist) {
+            bestDist = minD;
+            bestCx = tcx;
+            bestCy = tcy;
+          }
+        }
+        cx = bestCx;
+        cy = bestCy;
+      }
+
+      const left = cx - FISH_SLOT_W / 2;
+      const top = cy - FISH_SLOT_H / 2;
       wrap.style.left = `${left}px`;
       wrap.style.top = `${top}px`;
       wrap.style.width = `${FISH_SLOT_W}px`;
       wrap.style.height = `${FISH_SLOT_H}px`;
+      placedCenters.push({ x: cx, y: cy });
 
       // 内层: 待机浮动 (CSS keyframes) + 静态旋转
       const rot = (Math.random() - 0.5) * 6; // ±3°
@@ -210,7 +273,8 @@ export class FishPool {
       // 鼠标: 只接受左键
       if (e.pointerType === 'mouse' && e.button !== 0) return;
 
-      e.preventDefault();
+      // 不 preventDefault — 让浏览器也能合成 click 事件作为兜底
+      // e.preventDefault();
       try { el.setPointerCapture(e.pointerId); } catch (_) {}
       activePointer = e.pointerId;
 
@@ -348,6 +412,16 @@ export class FishPool {
     el.addEventListener('pointermove', onPointerMove);
     el.addEventListener('pointerup', onPointerEnd);
     el.addEventListener('pointercancel', onPointerEnd);
+
+    // 同时绑 click 作为 iOS 兜底 (有些 PWA 只 fire click 不 fire pointerdown)
+    el.addEventListener('click', (e) => {
+      if (fish.locked) return;
+      // iOS 单独 fire click 时 (PWA 偶尔), 这里补触发 onTap
+      // Game.onTap 幂等 (playNote + GSAP scale 可重放), 双触发只是重播同一音, 可接受
+      if (typeof this.onTap === 'function') {
+        try { this.onTap(el); } catch (err) { console.warn(err); }
+      }
+    });
   }
 
   // ============================================================
