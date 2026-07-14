@@ -7,7 +7,7 @@ import { Audio } from './systems/Audio.js';
 import { Progress } from './systems/Progress.js';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v13';
+const APP_VERSION = 'v14';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -26,6 +26,9 @@ function boot() {
   // 写入版本号
   const versionTag = document.getElementById('version-tag');
   if (versionTag) versionTag.textContent = APP_VERSION;
+
+  // 禁用 iOS Safari 缩放/双击
+  disableZoom();
 
   const game = new Game({
     stageEl: stage,
@@ -73,14 +76,37 @@ function boot() {
 }
 
 /**
+ * 禁用 iOS Safari 的双击缩放/双指捏合/手势缩放
+ * 关键: 在用户首次触摸前/中绑定, 全部 passive: false
+ */
+function disableZoom() {
+  // 阻止双指捏合
+  document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
+  // 阻止双击放大
+  let lastTouch = 0;
+  document.addEventListener('touchstart', (e) => {
+    const now = Date.now();
+    if (now - lastTouch < 300) e.preventDefault();
+    lastTouch = now;
+  }, { passive: false });
+  document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+  // 阻止多点触发的缩放
+  document.addEventListener('touchmove', (e) => {
+    if (e.touches && e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+}
+
+/**
  * 移动端强制布局: 直接给元素设 inline style
  * 基于 window.innerHeight 算出像素值, 绕开 iOS PWA 的 CSS 计算 bug
  */
 function applyPhoneLayout() {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  // 只在手机上用 JS 强制布局; iPad (≥700) 用默认 CSS grid
-  const isPhone = w <= 700;
+  // phone = 较小边 ≤ 500 (iPhone 16 Pro landscape 高 402, iPad mini 高 768)
+  const isPhone = Math.min(w, h) <= 500;
   if (!isPhone) return;  // 桌面/iPad 走 CSS grid
 
   const isLandscape = w > h;
