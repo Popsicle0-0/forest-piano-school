@@ -419,7 +419,46 @@ body::before {
 }
 
 .staff__dot.empty {
-  opacity: 0.18;
+  fill: rgba(255, 248, 236, 0.65);  /* cream-tinted */
+  stroke: rgba(61, 64, 91, 0.4);
+  stroke-width: 1.5;
+  opacity: 1;
+  animation: placeholderDotBreath 2.4s ease-in-out infinite;
+}
+@keyframes placeholderDotBreath {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50%      { transform: scale(1.06); opacity: 1; }
+}
+
+.staff__placeholder-ring {
+  fill: none;
+  stroke: rgba(61, 64, 91, 0.35);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+  animation: placeholderRingBreath 2.4s ease-in-out infinite;
+}
+.staff__placeholder-ring:hover {
+  stroke: rgba(255, 179, 71, 0.6);
+}
+@keyframes placeholderRingBreath {
+  0%, 100% { opacity: 0.5; stroke-dashoffset: 0; }
+  50%      { opacity: 0.85; stroke-dashoffset: 7; }
+}
+
+.staff__placeholder-label {
+  fill: rgba(61, 64, 91, 0.5);
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  pointer-events: none;
+  user-select: none;
+  /* subtle bobbing to invite user */
+  animation: placeholderLabelBob 3s ease-in-out infinite;
+}
+@keyframes placeholderLabelBob {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.7; }
 }
 
 /* hint 高亮 (拖动时显示) */
@@ -1002,4 +1041,50 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   .btn-secondary { font-size: 16px; padding: 10px 22px; }
   .btn-primary { font-size: 16px; padding: 10px 22px; }
   .overlay__text small { font-size: 13px; }
+}
+
+/* === v17.4: 通关统计 + 评级说明 === */
+.win-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0 8px;
+  flex-wrap: wrap;
+}
+.win-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-paper);
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  border: 2px solid transparent;
+}
+.win-stat__icon { font-size: 18px; }
+.win-stat__label { color: var(--text-sub); font-weight: 700; }
+.win-stat__value { font-weight: 900; color: var(--staff-strong); font-size: 16px; }
+.win-stat.good { border-color: rgba(6, 214, 160, 0.55); background: rgba(6, 214, 160, 0.12); }
+.win-stat.ok   { border-color: rgba(255, 209, 102, 0.6); background: rgba(255, 209, 102, 0.15); }
+.win-stat.meh  { border-color: rgba(224, 122, 95, 0.55); background: rgba(224, 122, 95, 0.12); }
+.win-stat.bad  { border-color: rgba(224, 122, 95, 0.8); background: rgba(224, 122, 95, 0.18); }
+
+.win-criteria {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin: 6px 0 18px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: var(--r-pill);
+  font-weight: 600;
+}
+.win-criteria .on { color: var(--warm-cta); }
+.win-criteria .off { opacity: 0.3; }
+
+/* Mobile shrink */
+@media (max-width: 768px) {
+  .win-stats { gap: 6px; }
+  .win-stat { font-size: 12px; padding: 5px 10px; }
+  .win-stat__icon { font-size: 14px; }
+  .win-criteria { font-size: 11px; padding: 6px 10px; }
 }

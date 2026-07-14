@@ -477,13 +477,35 @@ export class Game {
       `<span class="win-star ${i < stars ? 'on' : ''}">${i < stars ? '⭐' : '☆'}</span>`
     ).join('');
 
+    const mistakes = this.wrongCount;
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
       <div class="overlay__card">
         <div class="overlay__title">🎉 第一关完成!</div>
         <div class="win-stars">${starIcons}</div>
-        <p class="overlay__text">你已经认识了 Do Re Mi Fa Sol La Si<br><small>${this._correctnessComment(stars)}</small></p>
+        <p class="overlay__text">你已经认识了 Do Re Mi Fa Sol La Si</p>
+
+        <div class="win-stats">
+          <div class="win-stat ${mistakes === 0 ? 'good' : mistakes <= 2 ? 'ok' : mistakes <= 5 ? 'meh' : 'bad'}">
+            <span class="win-stat__icon">${mistakes === 0 ? '✨' : '✋'}</span>
+            <span class="win-stat__label">${mistakes === 0 ? '零错误' : '错误尝试'}</span>
+            <span class="win-stat__value">${mistakes === 0 ? '0 次' : mistakes + ' 次'}</span>
+          </div>
+          <div class="win-stat">
+            <span class="win-stat__icon">🎵</span>
+            <span class="win-stat__label">正确放置</span>
+            <span class="win-stat__value">${NOTES.length} / ${NOTES.length}</span>
+          </div>
+        </div>
+
+        <div class="win-criteria">
+          ${stars === 3 ? '<span class="on">⭐⭐⭐</span> 0 错 = 完美' :
+            stars === 2 ? '<span class="on">⭐⭐</span><span class="off">⭐</span> 1-2 错 = 优秀' :
+            stars === 1 ? '<span class="on">⭐</span><span class="off">⭐⭐</span> 3-5 错 = 良好' :
+            '<span class="off">⭐⭐⭐</span> 6+ 错 = 再练'}
+        </div>
+
         <div class="overlay__btns">
           <button class="btn-secondary" id="replay-btn">↻ 再玩一次</button>
           <button class="btn-primary" id="next-btn">下一关 ›</button>

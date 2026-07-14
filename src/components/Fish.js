@@ -36,10 +36,13 @@ export class Fish {
 
   render() {
     const { color, solfege, pitch } = this.note;
-    // 轻微随机旋转,避免 7 条鱼像复制粘贴
-    const rot = (Math.random() * 6 - 3).toFixed(1);
-    // 随机延迟眨眼,让 7 条不同步
+    // 大幅随机化 — 每条鱼都是独特的角色 (±15° + 大小变化 + 泡泡/腮红变化)
+    const rot = (Math.random() * 30 - 15).toFixed(1);   // ±15° (was ±3°)
+    const scaleVar = (0.85 + Math.random() * 0.30).toFixed(2);  // 0.85-1.15
     const blinkOffset = (Math.random() * 2).toFixed(2);
+    const hasBubble = Math.random() > 0.4;        // 60% 概率有思考泡泡
+    const bubbleR = (1.5 + Math.random() * 1.5).toFixed(1);
+    const blushOpacity = (0.4 + Math.random() * 0.35).toFixed(2);  // 0.4-0.75
 
     // 派生同色系的深/浅色(尾巴/背鳍),让身体更有层次
     const shadeHex = (hex, percent) => {
@@ -59,12 +62,12 @@ export class Fish {
     this.el.innerHTML = `
       <svg xmlns="${SVG_NS}" viewBox="0 0 96 72"
            style="display: block; width: 100%; height: 100%; overflow: visible;">
-        <g class="fish-body" transform="rotate(${rot} 48 36)">
+        <g class="fish-body" transform="rotate(${rot} 48 36) scale(${scaleVar})">
 
-          <!-- 思考泡泡 (头顶小泡泡,Kawaii 标志) -->
-          <circle cx="78" cy="10" r="3" fill="rgba(255,255,255,0.85)"
+          ${hasBubble ? `<!-- 思考泡泡 (60% 鱼有,大小也随机) -->
+          <circle cx="78" cy="10" r="${bubbleR}" fill="rgba(255,255,255,0.85)"
                   stroke="rgba(255,255,255,0.5)" stroke-width="0.4" />
-          <circle cx="84" cy="5" r="1.6" fill="rgba(255,255,255,0.75)" />
+          <circle cx="84" cy="5" r="${(bubbleR * 0.5).toFixed(1)}" fill="rgba(255,255,255,0.75)" />` : ''}
 
           <!-- 尾巴 (更圆润,带条纹) -->
           <path d="M2 36 Q8 20 22 28 L24 38 L24 42 L22 56 Q8 52 2 36 Z"
@@ -91,8 +94,8 @@ export class Fish {
           <path d="M28 32 Q26 40 28 48" fill="none"
                 stroke="rgba(0,0,0,0.28)" stroke-width="0.8" stroke-linecap="round" />
 
-          <!-- 腮红 (粉嫩小圆点) -->
-          <ellipse cx="68" cy="46" rx="3" ry="1.6" fill="rgba(255,140,170,0.6)" />
+          <!-- 腮红 (粉嫩小圆点,透明度随机) -->
+          <ellipse cx="68" cy="46" rx="3" ry="1.6" fill="rgba(255,140,170,${blushOpacity})" />
 
           <!-- 嘴巴 (友好微笑) -->
           <path d="M76 44 Q80 47 76 49" fill="none"

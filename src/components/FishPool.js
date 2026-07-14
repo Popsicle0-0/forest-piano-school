@@ -489,15 +489,96 @@ export class FishPool {
   }
 
   /**
-   * 重置: 把鱼送回初始位置 + 重新弹入 + 解锁所有鱼
+   * 重置: 把鱼送回(新随机)位置 + 重新弹入 + 解锁所有鱼
    * (重玩时 Game.js 调用)
+   *
+   * 关键: 不能复用 _placeFishes() — 它会重建 DOM、丢失已绑的事件和 lock 状态
+   * 所以这里复用 Poisson-disc 算法 (与 _placeFishes 同),但只更新 originalLeft/Top + DOM 位置
    */
   reset() {
     if (!this.pool) return;
-    // v17: 重玩时一并解除锁定 (单一来源, Game.js 不必单独 unlockAll)
+
+    // 1. 为每条鱼计算新随机位置,更新 originalLeft/originalTop
+    const rect = this.pool.getBoundingClientRect();
+    if (rect.width >= 2 && rect.height >= 2) {
+      const OVERFLOW = 30;
+      const padL = POOL_PAD_X;
+      const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
+      const padT = -OVERFLOW;
+      const padB = rect.height + OVERFLOW - FISH_SLOT_H;
+      const MIN_DIST = 70;
+      const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
+      const MAX_TRIES_PER_FISH = 80;
+
+      const placedCenters = [];
+      const tryPlace = (cx, cy) => {
+        for (let i = 0; i < placedCenters.length; i++) {
+          const c = placedCenters[i];
+          const dx = c.x - cx;
+          const dy = c.y - cy;
+          if (dx * dx + dy * dy < MIN_DIST_SQ) return false;
+        }
+        return true;
+      };
+
+      this.fishes.forEach((fish) => {
+        const cxMin = padL + FISH_SLOT_W / 2;
+        const cxMax = padR - FISH_SLOT_W / 2;
+        const cyMin = padT + FISH_SLOT_H / 2;
+        const cyMax = padB - FISH_SLOT_H / 2;
+        const cxRange = Math.max(1, cxMax - cxMin);
+        const cyRange = Math.max(1, cyMax - cyMin);
+
+        // Phase 1: 随机采样直到满足最小间距
+        let cx = 0, cy = 0, found = false;
+        for (let t = 0; t < MAX_TRIES_PER_FISH; t++) {
+          const tcx = cxMin + Math.random() * cxRange;
+          const tcy = cyMin + Math.random() * cyRange;
+          if (tryPlace(tcx, tcy)) {
+            cx = tcx;
+            cy = tcy;
+            found = true;
+            break;
+          }
+        }
+
+        // Phase 2: 实在找不到,挑"最不挤"的位置
+        if (!found) {
+          let bestDist = -Infinity;
+          let bestCx = cxMin;
+          let bestCy = cyMin;
+          for (let a = 0; a < 50; a++) {
+            const tcx = cxMin + Math.random() * cxRange;
+            const tcy = cyMin + Math.random() * cyRange;
+            let minD = Infinity;
+            for (let i = 0; i < placedCenters.length; i++) {
+              const c = placedCenters[i];
+              const dx = c.x - tcx;
+              const dy = c.y - tcy;
+              const d = Math.sqrt(dx * dx + dy * dy);
+              if (d < minD) minD = d;
+            }
+            if (minD > bestDist) {
+              bestDist = minD;
+              bestCx = tcx;
+              bestCy = tcy;
+            }
+          }
+          cx = bestCx;
+          cy = bestCy;
+        }
+
+        fish.originalLeft = cx - FISH_SLOT_W / 2;
+        fish.originalTop = cy - FISH_SLOT_H / 2;
+        placedCenters.push({ x: cx, y: cy });
+      });
+    }
+
+    // 2. 解锁所有鱼 + 把 DOM 复位到(新的)originalLeft/Top
     this.unlockAll();
+
+    // 3. 重新入场动画 (用 fromTo, y 从下方偏移开始 + 随机 stagger)
     this.fishes.forEach((fish) => {
-      // 重新入场动画 (用 fromTo, y 从下方偏移开始)
       gsap.fromTo(
         fish.el,
         { y: 60, opacity: 0.6, scale: 0.85 },

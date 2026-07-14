@@ -71,7 +71,11 @@ export class Staff {
             <text class="staff__label staff__label--top" x="${x}" y="${y - 28}" text-anchor="middle" visibility="hidden">
               <tspan class="pitch">${n.note}</tspan>
             </text>
-            <circle class="staff__dot empty" cx="${x}" cy="${y}" r="20" />
+            <g class="staff-slot__placeholder" data-for="${n.id}">
+              <circle class="staff__placeholder-ring" cx="${x}" cy="${y}" r="22" />
+              <circle class="staff__dot empty" cx="${x}" cy="${y}" r="20" />
+              <text class="staff__placeholder-label" x="${x}" y="${y + 5}" text-anchor="middle">?</text>
+            </g>
             <text class="staff__label staff__label--bot" x="${x}" y="${y + 38}" text-anchor="middle" visibility="hidden">${n.solfege}</text>
             <!-- 透明大热区,扩大拖放容差 -->
             <circle class="staff__hit" cx="${x}" cy="${y}" r="55" fill="transparent" />
@@ -125,6 +129,12 @@ export class Staff {
     // 归位成功后,标签永久显示
     slot.classList.add('filled');
     slot.querySelectorAll('.staff__label').forEach((l) => (l.style.visibility = 'visible'));
+
+    // 隐藏占位符 ring 和 ? 标签
+    const ring = slot.querySelector('.staff__placeholder-ring');
+    if (ring) ring.style.display = 'none';
+    const phLabel = slot.querySelector('.staff__placeholder-label');
+    if (phLabel) phLabel.style.display = 'none';
   }
 
   /**
@@ -158,6 +168,11 @@ export class Staff {
         dot.style.fill = '';
       }
       s.querySelectorAll('.staff__label').forEach((l) => (l.style.visibility = 'hidden'));
+      // 重新显示占位符 ring 和 ? 标签
+      const ring = s.querySelector('.staff__placeholder-ring');
+      if (ring) ring.style.display = '';
+      const phLabel = s.querySelector('.staff__placeholder-label');
+      if (phLabel) phLabel.style.display = '';
     });
   }
 }
