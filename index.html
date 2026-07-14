@@ -6,6 +6,11 @@
   <!-- iOS / iPadOS 全屏体验: viewport 锁死, 不允许缩放 -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
 
+  <!-- 强制不缓存 (解决 PWA 缓存问题) -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <!-- 添加到主屏幕后启用全屏 (无 Safari UI) -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -30,10 +35,13 @@
   <div id="app">
     <!-- 顶部 HUD -->
     <header class="hud">
-      <div class="hud__stars" id="hud-stars">
-        <span class="star" data-i="1">☆</span>
-        <span class="star" data-i="2">☆</span>
-        <span class="star" data-i="3">☆</span>
+      <div class="hud__left">
+        <div class="hud__stars" id="hud-stars">
+          <span class="star" data-i="1">☆</span>
+          <span class="star" data-i="2">☆</span>
+          <span class="star" data-i="3">☆</span>
+        </div>
+        <span class="hud__version" id="version-tag">v11</span>
       </div>
       <div class="hud__right">
         <button class="hud__btn" id="btn-sound" aria-label="声音">🔊</button>
