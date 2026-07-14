@@ -59,12 +59,47 @@ export class Game {
   }
 
   /**
-   * 启动关卡 (同步):
+   * 启动关卡 (同步): 清场 + 重置状态 + 按 levelId 分发
+   */
+  start({ levelId }) {
+    // 关闭所有 overlay
+    document.querySelectorAll('.overlay').forEach((el) => el.remove());
+    // 清空舞台 (重建场景, 避免叠加上一关的 DOM)
+    if (this.stage) this.stage.innerHTML = '';
+
+    // 重置状态
+    this.placed.clear();
+    this.wrongCount = 0;
+    this.hasTappedFish = false;
+    this.hasStartedDrag = false;
+    this._firstCorrectNote = null;
+    this.firstCorrectNote = null;
+    this._lastCorrectNote = '';
+    this._lastWrongHint = '';
+    this._clearHintTimer();
+    this._idleNudgeScheduled = false;
+    this.gate = false;
+
+    // 第二关状态
+    this._level2AnswerNote = null;
+    this._level2Current = 0;
+    this._level2Done = new Set();
+
+    if (levelId === 2) {
+      this._startLevel2();
+    } else {
+      this._startLevel1();
+    }
+  }
+
+  /**
+   * 第一关: 拖鱼归位 (原 start 逻辑)
    *   - 渲染场景
    *   - 显示"点我开始"遮罩
    *   - 遮罩上的点击会触发 audio.unlockOnGesture() 并开始游戏
    */
-  start({ levelId }) {
+  _startLevel1() {
+    this._showLevel2HUD(false);
     this.say('点屏幕开始呀～');
 
     // 1) 渲染场景(不依赖音频,先让用户看到东西)
@@ -73,6 +108,7 @@ export class Game {
     this.kb = new PianoKeyboard(this.stage, NOTES);
     this.fishPool = new FishPool(this.stage, NOTES);
     this.pip = new Pip(this.stage);
+    this.fishPool.setDragEnabled(true);   // 第一关允许拖动
 
     // 2) 鱼 → 五线谱 落点回调
     this.fishPool.onDrop = (fish, slotEl, accepted) => this.onFishDrop(fish, slotEl, accepted);
@@ -108,6 +144,162 @@ export class Game {
 
     // 4) 展示开始遮罩(用户点击是唯一的 iOS 解锁入口)
     this._showStartOverlay();
+  }
+
+  /**
+   * 第二关: 听音找鱼 (教学模式, 无拖拽)
+   *   系统播一个音, 孩子点对应的小鱼; 答错不扣星只重播提示.
+   */
+  _startLevel2() {
+    this._showLevel2HUD(true);
+    this.say('第二关, 听音找鱼! 系统会播一个音, 找对的小鱼~');
+
+    // 简化场景: 只要键盘 + 鱼池 (不要 Staff / Pip)
+    this.bg = new Background(this.stage);
+    this.kb = new PianoKeyboard(this.stage, NOTES);   // 让孩子按琴键自己试音
+    this.fishPool = new FishPool(this.stage, NOTES);
+    this.fishPool.setDragEnabled(false);              // 关键: 不允许拖, 只能点
+
+    // 题目状态
+    this._level2Total = 5;
+    this._level2Current = 0;
+    this._level2AnswerNote = null;
+    this._level2Done = new Set();
+    this.gate = true;
+
+    // 鱼点选 handler
+    this.fishPool.onTap = (fish) => {
+      this._markActivity();
+      if (!fish) return;
+      const id = fish.dataset.id;
+      if (!this._level2AnswerNote) return;   // 题还没出
+      this._handleLevel2Answer(id, fish);
+    };
+    this.fishPool.onDragStart = null;
+    this.fishPool.onDragMove = null;
+    this.fishPool.onDrop = null;
+
+    // 琴键按了 = 让孩子试音
+    this.kb.onPress = (keyEl) => {
+      this._markActivity();
+      this.audio.playNote(keyEl.dataset.pitch);
+      this.kb.glowKey(keyEl);
+    };
+
+    // 重听按钮
+    const replayBtn = document.getElementById('btn-replay-q');
+    if (replayBtn) replayBtn.onclick = () => this._replayQuestion();
+
+    // 重新触发布局 (新建的 DOM 需要 main.js 的 applyPhoneLayout/applyTabletLayout 接管)
+    setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
+
+    this._updateHudProgress();
+
+    // 第一题
+    setTimeout(() => this._level2NextQuestion(), 800);
+  }
+
+  // ============================================================
+  // 第二关: 听音找鱼 逻辑
+  // ============================================================
+
+  _handleLevel2Answer(id, fish) {
+    if (id === this._level2AnswerNote) {
+      // 答对
+      try { this.audio.correct(); } catch (_) {}
+      this._markLevel2FishCorrect(fish);
+      const note = NOTES.find((n) => n.id === id);
+      this._floatScore(window.innerWidth / 2, window.innerHeight / 2, (note ? note.solfege : '') + ' ✓');
+      this.say(`对啦! 这就是 ${note ? note.solfege : ''} 🎉`);
+      this._level2AnswerNote = null;  // 锁住本题, 防止连点
+      setTimeout(() => this._level2NextQuestion(), 1600);
+    } else {
+      // 答错 — 教学关不强制, 重播让再试
+      this.wrongCount++;
+      try { this.audio.wrong(); } catch (_) {}
+      fish.classList.add('shake');
+      setTimeout(() => fish.classList.remove('shake'), 400);
+      this.say(`刚才听到的是 ${this._lastPlayedSolfege}, 再找找看? 🎵`);
+      this._replayQuestion();
+    }
+  }
+
+  _level2NextQuestion() {
+    this._level2Current++;
+    if (this._level2Current > this._level2Total) {
+      return this._handleLevel2Win();
+    }
+
+    // 从"还没答对过"的音里随机挑 (7 音 >= 5 题, 保证不会挑到已锁定的鱼)
+    const done = this._level2Done || new Set();
+    const available = NOTES.filter((n) => !done.has(n.id));
+    const pool = available.length ? available : NOTES;
+    const note = pool[Math.floor(Math.random() * pool.length)];
+
+    this._level2AnswerNote = note.id;
+    this._lastPlayedSolfege = note.solfege;
+
+    this._updateLevel2HUD();
+    this.say('听一听, 哪条小鱼是这个音? 🎵');
+
+    // 播音
+    try { this.audio.playNote(note.pitch); } catch (_) {}
+  }
+
+  _replayQuestion() {
+    if (!this._level2AnswerNote) return;
+    const note = NOTES.find((n) => n.id === this._level2AnswerNote);
+    if (note) {
+      try { this.audio.playNote(note.pitch); } catch (_) {}
+    }
+  }
+
+  _markLevel2FishCorrect(fish) {
+    if (!this._level2Done) this._level2Done = new Set();
+    this._level2Done.add(fish.dataset.id);
+    fish.classList.add('fish--correct');
+    fish.style.pointerEvents = 'none';   // 答对的鱼禁止再点
+    this._updateHudProgress();
+  }
+
+  _updateLevel2HUD() {
+    this._updateHudProgress();
+  }
+
+  _updateHudProgress() {
+    const done = this._level2Done ? this._level2Done.size : 0;
+    const total = this._level2Total || 5;
+    const badge = document.getElementById('level2-badge');
+    if (badge) badge.textContent = `第 ${done} / ${total} 题`;
+    const replayBtn = document.getElementById('btn-replay-q');
+    if (replayBtn) replayBtn.style.display = (this._level2Current <= total) ? '' : 'none';
+  }
+
+  _handleLevel2Win() {
+    this.gate = false;
+    this._clearHintTimer();
+    const stars = this._calcStars();
+    try { this.progress.markLevelComplete(2, stars); } catch (_) {}
+    try { this.audio.playScale(['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4']); } catch (_) {}
+    try {
+      confetti({
+        particleCount: 140,
+        spread: 80,
+        origin: { y: 0.55 },
+        colors: ['#e63946', '#f4a261', '#ffc971', '#b5c99a', '#457b9d', '#9b5de5'],
+      });
+    } catch (_) {}
+    setTimeout(() => this.showWinOverlay(stars, 2), 1200);
+  }
+
+  /** 切换第二关 HUD 徽章 (隐藏进度点与普通重玩按钮) */
+  _showLevel2HUD(show) {
+    const el = document.getElementById('hud-level2');
+    if (el) el.style.display = show ? '' : 'none';
+    const dots = document.querySelector('.hud__dots');
+    if (dots) dots.style.display = show ? 'none' : '';
+    const btnReplay = document.getElementById('btn-replay');
+    if (btnReplay) btnReplay.style.display = show ? 'none' : '';
   }
 
   /** 通关后的开始遮罩 */
@@ -452,7 +644,7 @@ export class Game {
       colors: ['#e63946', '#f4a261', '#ffc971', '#b5c99a', '#457b9d', '#9b5de5'],
     });
 
-    setTimeout(() => this.showWinOverlay(earned), 1800);
+    setTimeout(() => this.showWinOverlay(earned, 1), 1800);
   }
 
   // ============================================================
@@ -469,7 +661,7 @@ export class Game {
     }
   }
 
-  showWinOverlay(stars) {
+  showWinOverlay(stars, wonLevel = 1) {
     // 关掉已有 overlay
     document.querySelectorAll('.overlay').forEach((el) => el.remove());
 
@@ -478,13 +670,19 @@ export class Game {
     ).join('');
 
     const mistakes = this.wrongCount;
+    const isL2 = wonLevel === 2;
+    const title = isL2 ? '🎉 第二关完成!' : '🎉 第一关完成!';
+    const subText = isL2 ? '你的耳朵越来越灵啦! 听音找鱼全对~' : '你已经认识了 Do Re Mi Fa Sol La Si';
+    const doneCount = isL2 ? (this._level2Total || 5) : NOTES.length;
+    const doneLabel = isL2 ? '答对题数' : '正确放置';
+
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
       <div class="overlay__card">
-        <div class="overlay__title">🎉 第一关完成!</div>
+        <div class="overlay__title">${title}</div>
         <div class="win-stars">${starIcons}</div>
-        <p class="overlay__text">你已经认识了 Do Re Mi Fa Sol La Si</p>
+        <p class="overlay__text">${subText}</p>
 
         <div class="win-stats">
           <div class="win-stat ${mistakes === 0 ? 'good' : mistakes <= 2 ? 'ok' : mistakes <= 5 ? 'meh' : 'bad'}">
@@ -494,8 +692,8 @@ export class Game {
           </div>
           <div class="win-stat">
             <span class="win-stat__icon">🎵</span>
-            <span class="win-stat__label">正确放置</span>
-            <span class="win-stat__value">${NOTES.length} / ${NOTES.length}</span>
+            <span class="win-stat__label">${doneLabel}</span>
+            <span class="win-stat__value">${doneCount} / ${doneCount}</span>
           </div>
         </div>
 
@@ -514,15 +712,47 @@ export class Game {
     `;
     document.body.appendChild(overlay);
 
-    overlay.querySelector('#replay-btn').addEventListener('click', () => {
+    const nextBtn = overlay.querySelector('#next-btn');
+    if (wonLevel === 1) {
+      nextBtn.textContent = '第 2 关 ›';
+      nextBtn.onclick = () => {
+        overlay.remove();
+        this.say('第二关马上来...');
+        this.start({ levelId: 2 });
+      };
+    } else {
+      nextBtn.textContent = '🎉 全部完成';
+      nextBtn.onclick = () => {
+        overlay.remove();
+        this._showAllDoneOverlay();
+      };
+    }
+
+    overlay.querySelector('#replay-btn').onclick = () => {
       overlay.remove();
-      this.restartLevel();
-    });
-    overlay.querySelector('#next-btn').addEventListener('click', () => {
+      this.start({ levelId: wonLevel });
+    };
+  }
+
+  /** 全部关卡完成: 庆祝 + 预告更多关卡 */
+  _showAllDoneOverlay() {
+    document.querySelectorAll('.overlay').forEach((el) => el.remove());
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.innerHTML = `
+      <div class="overlay__card">
+        <div class="overlay__title">🌟 全部完成!</div>
+        <div class="overlay__text">已经认识了 7 个音符 + 听音找鱼<br>更多关卡以后解锁~</div>
+        <div class="overlay__btns">
+          <button class="btn-secondary" id="replay-btn">↻ 再玩一次 (第 1 关)</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#replay-btn').onclick = () => {
       overlay.remove();
-      this.say('第二关(听音找鱼)马上就到...');
-      // 占位: 等后续开发
-    });
+      this.start({ levelId: 1 });
+    };
   }
 
   _correctnessComment(stars) {
@@ -541,6 +771,7 @@ export class Game {
   restartLevel() {
     // 清遮罩
     document.querySelectorAll('.overlay').forEach((el) => el.remove());
+    this._showLevel2HUD(false);
 
     // 状态重置
     this.placed.clear();

@@ -7,7 +7,7 @@ import { Audio } from './systems/Audio.js';
 import { Progress } from './systems/Progress.js';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v17.6';
+const APP_VERSION = 'v17.7';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };

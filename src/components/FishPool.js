@@ -70,6 +70,7 @@ export class FishPool {
     this.onDragStart = null;  // (fishEl) => void  可选 (触发 hover 音)
     this.onDragMove = null;   // (fishEl, nearestSlotEl|null) => void  可选 (位置提示)
     this.onTap = null;        // (fishEl) => void  可选 (单击听声)
+    this._dragEnabled = true;  // 默认允许拖动 (level 1); level 2 关掉只允许点
     this._lastHoveredSlot = null;
     this.TAP_THRESHOLD = 12;  // 移动 < 12px 视为单击 (iOS 手指精度不为 0, 放宽更友好)
 
@@ -276,6 +277,7 @@ export class FishPool {
     const onPointerDown = (e) => {
       // v17: 已正确放置的鱼锁定, 不让再拖
       if (fish.locked) return;
+      if (this._dragEnabled === false) return; // 关拖动时 (level 2) 直接忽略, 只允许 click/tap
       if (activePointer !== null) return; // 单鱼只接一个触点
       // 鼠标: 只接受左键
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -445,6 +447,14 @@ export class FishPool {
     if (!fish) return;
     fish.locked = true;
     fish.el.classList.add('fish--locked');
+  }
+
+  /**
+   * 是否允许拖动 (level 2 关拖动, 只允许点选)
+   * @param {boolean} enabled
+   */
+  setDragEnabled(enabled) {
+    this._dragEnabled = enabled !== false;
   }
 
   /**
