@@ -86,21 +86,38 @@ export class Game {
         <div class="overlay__title" style="font-size:56px;margin-bottom:8px">🐤</div>
         <h2 class="overlay__title">森林钢琴学校</h2>
         <p class="overlay__text">帮 7 条小鱼 Do Re Mi Fa Sol La Si<br>找到它们在钢琴上的家!</p>
-        <button class="btn-primary" id="start-btn">开始 ›</button>
+        <button class="btn-primary" id="start-btn">点我开始 ›</button>
       </div>
     `;
     document.body.appendChild(overlay);
 
-    const onStart = async () => {
+    // iOS Safari: pointerdown 比 click 灵敏得多, 立即响应 + 立即解锁音频
+    let started = false;
+    const onStart = async (e) => {
+      if (started) return;
+      started = true;
+      if (e) e.preventDefault();
+      // 立即给视觉反馈
+      const btn = overlay.querySelector('#start-btn');
+      if (btn) {
+        btn.textContent = '加载声音中…';
+        btn.disabled = true;
+      }
       // iOS / Safari: 必须在用户手势里同步触发 Tone.start()
-      try { await this.audio.unlockOnGesture(); } catch (e) { console.warn(e); }
+      try { await this.audio.unlockOnGesture(); } catch (err) { console.warn(err); }
       overlay.remove();
       this._beginLevel();
     };
 
-    overlay.querySelector('#start-btn').addEventListener('click', onStart, { once: true });
-    // 也允许点遮罩任意位置开始
-    overlay.addEventListener('click', () => onStart(), { once: true });
+    // 用 pointerdown 立即响应, 不用 click (iOS 有 300ms 延迟)
+    const btn = overlay.querySelector('#start-btn');
+    btn.addEventListener('pointerdown', onStart);
+    // 整张遮罩也可点 (兜底)
+    overlay.addEventListener('pointerdown', (e) => {
+      // 如果点的是按钮已经处理了
+      if (e.target.closest('#start-btn')) return;
+      onStart(e);
+    });
   }
 
   _beginLevel() {
