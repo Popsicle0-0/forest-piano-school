@@ -304,6 +304,9 @@ body::before {
   box-shadow: inset 0 -4px 0 rgba(255, 255, 255, 0.08), 0 4px 0 rgba(0, 0, 0, 0.2);
   position: absolute;
   z-index: 2;
+  /* 黑键纯装饰,不接收 pointer 事件 → 点击不发声 */
+  pointer-events: none !important;
+  cursor: default;
 }
 
 .key--black.pressed {

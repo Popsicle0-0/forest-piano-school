@@ -10,10 +10,10 @@ import { gsap } from 'gsap';
 
 // 吸附容差 (px) — 鱼在底部,五线谱在顶部,需要更大容错
 const SNAP_RADIUS = 280;
-const POOL_PAD_X = 16;
+const POOL_PAD_X = 50;   // 鱼左右边缘 padding (避免鱼靠边)
 // 单条鱼的近似可视尺寸 (Fish.js 自适应,这里只用于布局估算)
-const FISH_SLOT_W = 96;  // was 78 — match Fish.js visual width (更大点击区)
-const FISH_SLOT_H = 76;  // was 78 — match Fish.js visual height + 4px margin
+const FISH_SLOT_W = 84;  // was 96 — 缩小 17% 让鱼更小更分散
+const FISH_SLOT_H = 64;  // was 76 — 缩小给鱼更多垂直散开空间
 
 const STYLE_ID = 'forest-piano-fishpool-keyframes';
 
@@ -26,6 +26,7 @@ function injectStyles() {
     .fish-inner {
       transform-origin: 50% 50%;
       will-change: transform;
+      transform: rotate(var(--fish-rot, 0deg)); /* 静态旋转在 inner:视觉倾斜,不影响 hit area */
       width: 100%;
       height: 100%;
       pointer-events: none; /* 事件穿透到 .fish wrapper */
@@ -33,11 +34,13 @@ function injectStyles() {
     .fish-inner > * {
       pointer-events: none;
     }
+    /* v17.6: 浮动动画放在 wrapper (.fish) 上, 让 hit area 跟随视觉位置
+       (原来放 inner, wrapper 不动, 鱼浮起时 hit 区比鱼低 12px → 触屏"模糊") */
     @keyframes fishFloat {
-      from { transform: rotate(var(--fish-rot, 0deg)) translateY(0); }
-      to   { transform: rotate(var(--fish-rot, 0deg)) translateY(-12px); }
+      from { transform: translateY(0); }
+      to   { transform: translateY(-6px); }    /* was -12px — 缩小漂移,触屏更准 */
     }
-    .fish-inner.is-floating {
+    .fish.is-floating {
       animation: fishFloat var(--fish-float-dur, 2.6s) ease-in-out
                  var(--fish-float-delay, 0s) infinite alternate;
     }
@@ -107,15 +110,15 @@ export class FishPool {
     }
 
     // Poisson-disc-like: 每条新鱼至少 MIN_DIST 远离已放置的鱼
-    const OVERFLOW_X = 6;   // 允许鱼稍微越过左右边 (可选)
-    const OVERFLOW_Y = 0;   // 不允许鱼超过上下 (避免出画面)
-    const padL = POOL_PAD_X - OVERFLOW_X;
-    const padR = rect.width - POOL_PAD_X - FISH_SLOT_W + OVERFLOW_X;
-    const padT = OVERFLOW_Y;
-    const padB = rect.height - OVERFLOW_Y - FISH_SLOT_H;
-    const MIN_DIST = 70;        // px, 鱼中心点之间的最小间距 (was 28 — force more separation)
+    const OVERFLOW_X = 0;       // 鱼严格不超出左右边界 (避免靠边)
+    const OVERFLOW_Y = 18;      // 允许鱼稍微越过 fish-pool 上边 (进入 staff 区域但仍在 stage 内)
+    const padL = POOL_PAD_X;    // 50 — 左边距
+    const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;  // 严格不超出右边界
+    const padT = -OVERFLOW_Y;   // -18 → cy range 起点 (允许向上溢出)
+    const padB = rect.height - FISH_SLOT_H;  // 不超出下边界
+    const MIN_DIST = 56;        // px, 鱼中心点之间的最小间距 (84x64 鱼新尺寸适配)
     const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
-    const MAX_TRIES_PER_FISH = 80;  // was 60 — give more chances
+    const MAX_TRIES_PER_FISH = 90;  // was 80 — 给更多机会
     const placedCenters = [];
 
     // Helper: candidate (cx, cy) 距所有已放置鱼是否 >= MIN_DIST
@@ -131,7 +134,7 @@ export class FishPool {
 
     shuffled.forEach((note) => {
       const wrap = document.createElement('div');
-      wrap.className = 'fish';
+      wrap.className = 'fish is-floating';  // v17.6: 浮动在 wrapper — hit area 跟视觉走
       wrap.dataset.id = note.id;
       wrap.dataset.color = note.color;
       wrap.dataset.solfege = note.solfege;
@@ -164,12 +167,12 @@ export class FishPool {
         }
       }
 
-      // Phase 2: 实在找不到,挑 50 个候选里"最不挤"的那个位置
+      // Phase 2: 实在找不到,挑 60 个候选里"最不挤"的那个位置
       if (!found) {
         let bestDist = -Infinity;
         let bestCx = cxMin;
         let bestCy = cyMin;
-        for (let attempt = 0; attempt < 50; attempt++) {
+        for (let attempt = 0; attempt < 60; attempt++) {
           const tcx = cxMin + Math.random() * cxRange;
           const tcy = cyMin + Math.random() * cyRange;
           let minD = Infinity;
@@ -203,11 +206,13 @@ export class FishPool {
       const dur = 2 + Math.random();          // 2-3s
       const delay = -Math.random() * dur;     // 负 delay 错相位,避免同时浮
 
+      // 动画在 wrapper 上 → 时长/相位变量也放 wrapper
+      wrap.style.setProperty('--fish-float-dur', `${dur.toFixed(2)}s`);
+      wrap.style.setProperty('--fish-float-delay', `${delay.toFixed(2)}s`);
+
       const inner = document.createElement('div');
-      inner.className = 'fish-inner is-floating';
+      inner.className = 'fish-inner';        // v17.6: 移除 is-floating — wrapper 负责浮动
       inner.style.setProperty('--fish-rot', `${rot.toFixed(2)}deg`);
-      inner.style.setProperty('--fish-float-dur', `${dur.toFixed(2)}s`);
-      inner.style.setProperty('--fish-float-delay', `${delay.toFixed(2)}s`);
 
       // Fish.js 内容 (兼容多种返回形式)
       let fishContent = null;
@@ -289,7 +294,7 @@ export class FishPool {
 
       // 抬起 z-index + 暂停浮动 (但保留相位)
       el.classList.add('dragging');
-      fish.inner.style.animationPlayState = 'paused';
+      fish.el.style.animationPlayState = 'paused';  // v17.6: 动画在 wrapper, 暂停 wrapper
 
       // 切到 fixed 跟手 (避开 offsetParent 抖动)
       el.style.position = 'fixed';
@@ -298,7 +303,7 @@ export class FishPool {
       el.style.right = 'auto';
       el.style.bottom = 'auto';
       el.style.margin = '0';
-      el.style.transform = 'scale(1.08)';
+      el.style.transform = 'scale(1.03)';  // v17.6: was 1.08 — 缩小放大, 让手指和鱼更贴
 
       if (typeof this.onDragStart === 'function') {
         try { this.onDragStart(el); } catch (err) { console.warn(err); }
@@ -352,7 +357,7 @@ export class FishPool {
         el.style.bottom = '';
         el.style.margin = '';
         el.style.transform = '';
-        fish.inner.style.animationPlayState = '';
+        fish.el.style.animationPlayState = '';  // v17.6: 动画在 wrapper → 恢复 wrapper
 
         if (typeof this.onDragMove === 'function') {
           this._lastHoveredSlot = null;
@@ -396,7 +401,7 @@ export class FishPool {
       el.style.bottom = '';
       el.style.margin = '';
       el.style.transform = '';
-      fish.inner.style.animationPlayState = '';
+      fish.el.style.animationPlayState = '';  // v17.6: 动画在 wrapper → 恢复 wrapper
 
       // 清除位置提示
       if (typeof this.onDragMove === 'function') {
@@ -458,7 +463,7 @@ export class FishPool {
       fish.el.style.bottom = '';
       fish.el.style.margin = '';
       fish.el.style.transform = '';
-      fish.inner.style.animationPlayState = '';
+      fish.el.style.animationPlayState = '';  // v17.6: 动画在 wrapper → 恢复 wrapper
     });
   }
 
@@ -501,15 +506,15 @@ export class FishPool {
     // 1. 为每条鱼计算新随机位置,更新 originalLeft/originalTop
     const rect = this.pool.getBoundingClientRect();
     if (rect.width >= 2 && rect.height >= 2) {
-      const OVERFLOW_X = 6;   // 允许鱼稍微越过左右边 (可选)
-      const OVERFLOW_Y = 0;   // 不允许鱼超过上下 (避免出画面)
-      const padL = POOL_PAD_X - OVERFLOW_X;
-      const padR = rect.width - POOL_PAD_X - FISH_SLOT_W + OVERFLOW_X;
-      const padT = OVERFLOW_Y;
-      const padB = rect.height - OVERFLOW_Y - FISH_SLOT_H;
-      const MIN_DIST = 70;
+      const OVERFLOW_X = 0;       // 鱼严格不超出左右边界 (避免靠边)
+      const OVERFLOW_Y = 18;      // 允许鱼稍微越过 fish-pool 上边 (进入 staff 区域但仍在 stage 内)
+      const padL = POOL_PAD_X;    // 50
+      const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;  // 严格不超出右边界
+      const padT = -OVERFLOW_Y;   // -18
+      const padB = rect.height - FISH_SLOT_H;  // 不超出下边界
+      const MIN_DIST = 56;
       const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
-      const MAX_TRIES_PER_FISH = 80;
+      const MAX_TRIES_PER_FISH = 90;
 
       const placedCenters = [];
       const tryPlace = (cx, cy) => {
@@ -548,7 +553,7 @@ export class FishPool {
           let bestDist = -Infinity;
           let bestCx = cxMin;
           let bestCy = cyMin;
-          for (let a = 0; a < 50; a++) {
+          for (let a = 0; a < 60; a++) {
             const tcx = cxMin + Math.random() * cxRange;
             const tcy = cyMin + Math.random() * cyRange;
             let minD = Infinity;
