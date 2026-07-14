@@ -559,13 +559,14 @@ body::before {
 }
 
 @media (max-width: 768px) {
-  /* === 手机布局: 全部 absolute 定位, 不用 grid === */
+  /* === 手机布局: 全部用 flex column, iOS Safari 最稳 === */
+  #app {
+    display: flex;
+    flex-direction: column;
+  }
+
   .hud {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 44px;             /* 固定高度, 不依赖 auto */
+    flex: 0 0 44px;
     z-index: 20;
     padding: 6px 8px;
     background: rgba(255, 248, 236, 0.92);
@@ -575,27 +576,25 @@ body::before {
   .hud__right { gap: 6px; }
   .hud__btn { width: 38px; height: 38px; font-size: 18px; }
 
-  /* 舞台: 固定在 HUD 下方, 高度 = 总高 - HUD - bubble */
+  /* 舞台: flex column, 占满 HUD 和 bubble 之间 */
   .stage {
-    position: absolute;
-    top: 44px;
-    bottom: 56px;
-    left: 0;
-    right: 0;
+    flex: 1 1 auto;
+    min-height: 0;          /* 关键: flex 容器要 min-height: 0 才能正确缩放 */
+    display: flex;
+    flex-direction: column;
+    position: relative;
     overflow: hidden;
   }
 
-  /* 五线谱: 占舞台顶部 45% */
+  /* 五线谱: flex 1 占满 staff 区 */
   .staff-wrap.stage__staff-area {
-    position: absolute;
-    top: 0;
-    left: 6px;
-    right: 6px;
-    height: 45%;
+    flex: 1 1 0;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0;
+    padding: 0 6px;
   }
   .staff-wrap svg.staff {
     width: 100% !important;
@@ -605,15 +604,13 @@ body::before {
     display: block;
   }
 
-  /* 钢琴键盘: 占舞台底部 40% */
+  /* 钢琴键盘: flex 0, 给固定最小高度保证可见 */
   .keyboard-area.stage__kb-area {
-    position: absolute;
-    bottom: 0;
-    left: 6px;
-    right: 6px;
-    height: 40%;
-    overflow-x: auto;
-    overflow-y: hidden;
+    flex: 0 0 auto;
+    min-height: 100px;       /* 关键: 最小 100px, 保证看得到 */
+    max-height: 40%;
+    width: 100%;
+    overflow: hidden;
     -webkit-overflow-scrolling: touch;
     display: flex;
     align-items: flex-end;
@@ -629,22 +626,19 @@ body::before {
     display: block;
   }
 
-  /* 鱼池: 浮在舞台中下部 (staff 下方, keyboard 上方) */
+  /* 鱼池: absolute 浮在 staff 和 keyboard 之间 */
   .fish-pool {
     position: absolute;
-    bottom: 40%;
+    bottom: 30%;
     left: 0;
     right: 0;
-    height: 22%;
+    height: 90px;             /* 固定像素, 不依赖 % */
+    pointer-events: none;
   }
   .fish-pool .fish { transform: scale(0.7); transform-origin: center; }
 
   .bubble {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 50px;
+    flex: 0 0 50px;
     padding: 6px 12px;
     gap: 6px;
     margin: 0;
@@ -668,17 +662,24 @@ body::before {
 }
 
 @media (max-width: 920px) and (orientation: landscape) {
-  /* iPhone / 小平板 横屏 (iPhone 16 Pro landscape: 874×402)
-     iPhone 16 Pro: 874 wide × 402 tall, 视高 320px (减 HUD/bubble)
-     给 staff 多空间 (60%), keyboard 缩小 (30%) */
-  .hud { height: 40px; padding: 4px 10px; }
-  .stage { top: 40px; bottom: 52px; }
-  .staff-wrap.stage__staff-area { height: 58%; }
-  .keyboard-area.stage__kb-area { height: 32%; }
-  .fish-pool { bottom: 32%; height: 18%; }
-  .bubble { height: 50px; padding: 4px 12px; }
+  /* iPhone 16 Pro landscape: 874×402
+     用 flex column, 关键 min-height 强制键盘可见 */
+  .hud { flex: 0 0 36px; padding: 4px 10px; }
   .hud__btn { width: 34px; height: 34px; font-size: 16px; }
   .hud__stars { font-size: 18px; }
+  .bubble { flex: 0 0 44px; padding: 4px 12px; }
+  .bubble__text { font-size: 12px; }
+  /* 键盘: 横屏强制可见, 最小 90px */
+  .keyboard-area.stage__kb-area {
+    min-height: 90px;
+    max-height: 40%;
+  }
+  /* 鱼池: 横屏固定 80px 高, 浮在中间 */
+  .fish-pool {
+    bottom: 90px;
+    height: 80px;
+  }
+  .fish-pool .fish { transform: scale(0.6); }
 }
 
 input, textarea, select { font-size: 16px; }
