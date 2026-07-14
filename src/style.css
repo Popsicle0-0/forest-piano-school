@@ -559,36 +559,42 @@ body::before {
 }
 
 @media (max-width: 768px) {
-  /* === 手机布局: 全部用 flex column, iOS Safari 最稳 === */
+  /* === 手机布局: 用 vh 视口单位, 绕开 iOS PWA 百分比 bug === */
+  /* 注意: 在 PWA 模式 (添加到主屏幕) 下 100vh = 全屏高, 100dvh 也一样 */
+
   #app {
     display: flex;
     flex-direction: column;
   }
 
   .hud {
-    flex: 0 0 44px;
+    flex: 0 0 auto;
+    height: 9vh;
+    min-height: 36px;
     z-index: 20;
-    padding: 6px 8px;
-    background: rgba(255, 248, 236, 0.92);
+    padding: 4px 8px;
+    background: rgba(255, 248, 236, 0.95);
     backdrop-filter: blur(8px);
   }
   .hud__stars { font-size: 20px; gap: 2px; }
   .hud__right { gap: 6px; }
   .hud__btn { width: 38px; height: 38px; font-size: 18px; }
 
-  /* 舞台: flex column, 占满 HUD 和 bubble 之间 */
+  /* 舞台: 明确 vh 高度, 不用 flex auto */
   .stage {
-    flex: 1 1 auto;
-    min-height: 0;          /* 关键: flex 容器要 min-height: 0 才能正确缩放 */
+    flex: 0 0 auto;
+    height: 78vh;            /* 100vh - 9vh HUD - 13vh bubble = 78vh */
+    min-height: 200px;
     display: flex;
     flex-direction: column;
     position: relative;
     overflow: hidden;
   }
 
-  /* 五线谱: flex 1 占满 staff 区 */
+  /* 五线谱: 占舞台 top 50% */
   .staff-wrap.stage__staff-area {
-    flex: 1 1 0;
+    flex: 0 0 auto;
+    height: 50%;
     min-height: 0;
     display: flex;
     align-items: center;
@@ -604,12 +610,13 @@ body::before {
     display: block;
   }
 
-  /* 钢琴键盘: flex 0, 给固定最小高度保证可见 */
+  /* 钢琴键盘: 关键! vh 高度, 强制可见 + 加背景色便于诊断 */
   .keyboard-area.stage__kb-area {
     flex: 0 0 auto;
-    min-height: 100px;       /* 关键: 最小 100px, 保证看得到 */
-    max-height: 40%;
+    height: 32vh;
+    min-height: 110px;       /* 强制最小 110px, 保证看得到! */
     width: 100%;
+    background: rgba(255, 209, 102, 0.15);   /* 调试用: 半透明黄底 */
     overflow: hidden;
     -webkit-overflow-scrolling: touch;
     display: flex;
@@ -621,24 +628,28 @@ body::before {
   .keyboard-area svg.keyboard {
     width: 100% !important;
     height: 100% !important;
+    min-height: 100px;
     max-width: 100%;
     max-height: 100%;
     display: block;
   }
 
-  /* 鱼池: absolute 浮在 staff 和 keyboard 之间 */
+  /* 鱼池: absolute, 浮在 staff 和 keyboard 中间 */
   .fish-pool {
     position: absolute;
-    bottom: 30%;
+    bottom: 32vh;            /* 跟键盘高度对齐 */
     left: 0;
     right: 0;
-    height: 90px;             /* 固定像素, 不依赖 % */
+    height: 18vh;
+    min-height: 60px;
     pointer-events: none;
   }
   .fish-pool .fish { transform: scale(0.7); transform-origin: center; }
 
   .bubble {
-    flex: 0 0 50px;
+    flex: 0 0 auto;
+    height: 13vh;
+    min-height: 50px;
     padding: 6px 12px;
     gap: 6px;
     margin: 0;
@@ -662,24 +673,21 @@ body::before {
 }
 
 @media (max-width: 920px) and (orientation: landscape) {
-  /* iPhone 16 Pro landscape: 874×402
-     用 flex column, 关键 min-height 强制键盘可见 */
-  .hud { flex: 0 0 36px; padding: 4px 10px; }
+  /* iPhone 16 Pro landscape: 874×402 (PWA 模式 100vh = 402)
+     关键: 键盘 height 用 32vh (= 129px on 402), 强制 min 100px */
+  .hud { height: 7vh; min-height: 32px; padding: 4px 10px; }
   .hud__btn { width: 34px; height: 34px; font-size: 16px; }
   .hud__stars { font-size: 18px; }
-  .bubble { flex: 0 0 44px; padding: 4px 12px; }
+  .bubble { height: 11vh; min-height: 40px; padding: 4px 12px; }
   .bubble__text { font-size: 12px; }
-  /* 键盘: 横屏强制可见, 最小 90px */
+  .stage { height: 82vh; }
+  /* 键盘: 横屏关键! 32vh = 128px on 16 Pro, 强制可见 */
   .keyboard-area.stage__kb-area {
-    min-height: 90px;
-    max-height: 40%;
+    height: 32vh;            /* 128px on 16 Pro landscape */
+    min-height: 100px;
   }
-  /* 鱼池: 横屏固定 80px 高, 浮在中间 */
-  .fish-pool {
-    bottom: 90px;
-    height: 80px;
-  }
-  .fish-pool .fish { transform: scale(0.6); }
+  .fish-pool { bottom: 32vh; height: 16vh; min-height: 50px; }
+  .fish-pool .fish { transform: scale(0.55); }
 }
 
 input, textarea, select { font-size: 16px; }
