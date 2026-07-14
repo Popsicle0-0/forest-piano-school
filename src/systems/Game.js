@@ -18,6 +18,22 @@
 import { Staff } from '../components/Staff.js';
 import { PianoKeyboard } from '../components/PianoKeyboard.js';
 import { FishPool } from '../components/FishPool.js';
+
+// v17.8+: 多关卡注册表. 自动扫描 src/systems/Level*.js, 每个文件 default 导出
+// 一个 (game) => teardownFn 的启动函数. Game.start({levelId}) 通过本表分发.
+// 新增关卡只需创建一个 LevelN.js, 无需修改 Game.js.
+const LEVEL_FILES = import.meta.glob('./Level*.js', { eager: true });
+const levelStarters = new Map();
+for (const [path, mod] of Object.entries(LEVEL_FILES)) {
+  const m = path.match(/Level(\d+)\.js$/);
+  if (m && typeof mod.default === 'function') {
+    levelStarters.set(parseInt(m[1], 10), mod.default);
+  }
+}
+if (typeof window !== 'undefined') {
+  window.__forestPiano = window.__forestPiano || {};
+  window.__forestPiano.levels = levelStarters;
+}
 import { Background } from '../components/Background.js';
 import { Pip } from '../components/Pip.js';
 import confetti from 'canvas-confetti';
@@ -60,6 +76,10 @@ export class Game {
 
   /**
    * 启动关卡 (同步): 清场 + 重置状态 + 按 levelId 分发
+   *
+   * 新版: 用 levelStarters Map 分发. 每个关卡 (LevelN.js) 默认导出一个函数
+   *   (game) => teardownFn, 调用后游戏进该关卡状态, teardownFn 在切换关卡时调用.
+   * 这让新增关卡无需修改 Game.js — 直接添加 src/systems/LevelN.js 文件即可.
    */
   start({ levelId }) {
     // 关闭所有 overlay
@@ -85,11 +105,32 @@ export class Game {
     this._level2Current = 0;
     this._level2Done = new Set();
 
-    if (levelId === 2) {
-      this._startLevel2();
-    } else {
-      this._startLevel1();
+    // teardown 旧关卡 (如有)
+    if (typeof this._teardownCurrentLevel === 'function') {
+      try { this._teardownCurrentLevel(); } catch (_) {}
+      this._teardownCurrentLevel = null;
     }
+
+    const starter = levelStarters.get(levelId);
+    if (starter) {
+      try {
+        const teardown = starter(this);
+        this._teardownCurrentLevel = typeof teardown === 'function' ? teardown : null;
+      } catch (err) {
+        console.error(`Level ${levelId} failed to start:`, err);
+        this._fallbackToLevel1();
+      }
+      return;
+    }
+
+    // fallback - 默认第一关
+    console.warn(`Level ${levelId} not registered, falling back to Level 1`);
+    this._startLevel1();
+  }
+
+  _fallbackToLevel1() {
+    const starter = levelStarters.get(1) || this._startLevel1.bind(this);
+    try { starter(this); } catch (err) { console.error(err); }
   }
 
   /**
