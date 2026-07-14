@@ -109,11 +109,13 @@ export class FishPool {
     // Poisson-disc-like: 每条新鱼至少 MIN_DIST 远离已放置的鱼
     const padL = POOL_PAD_X;
     const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
-    const padT = 8;
-    const padB = rect.height - 8 - FISH_SLOT_H;
-    const MIN_DIST = 28;        // px, 鱼中心点之间的最小间距
+    // Allow fish to overflow vertically — they appear "across the river"
+    const OVERFLOW = 30;        // 允许鱼超出 fish-pool 上下边界 (z-index 让它们浮在 staff/keyboard 之上)
+    const padT = -OVERFLOW;
+    const padB = rect.height + OVERFLOW - FISH_SLOT_H;
+    const MIN_DIST = 70;        // px, 鱼中心点之间的最小间距 (was 28 — force more separation)
     const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
-    const MAX_TRIES_PER_FISH = 60;
+    const MAX_TRIES_PER_FISH = 80;  // was 60 — give more chances
     const placedCenters = [];
 
     // Helper: candidate (cx, cy) 距所有已放置鱼是否 >= MIN_DIST
@@ -162,12 +164,12 @@ export class FishPool {
         }
       }
 
-      // Phase 2: 实在找不到,挑 30 个候选里"最不挤"的那个位置
+      // Phase 2: 实在找不到,挑 50 个候选里"最不挤"的那个位置
       if (!found) {
         let bestDist = -Infinity;
         let bestCx = cxMin;
         let bestCy = cyMin;
-        for (let attempt = 0; attempt < 30; attempt++) {
+        for (let attempt = 0; attempt < 50; attempt++) {
           const tcx = cxMin + Math.random() * cxRange;
           const tcy = cyMin + Math.random() * cyRange;
           let minD = Infinity;

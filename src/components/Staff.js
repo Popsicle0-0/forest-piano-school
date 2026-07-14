@@ -1,18 +1,18 @@
 /**
  * 五线谱组件
- * - viewBox 0 0 1024 220
- * - 5 条主线 x:80~1004;Do 的下方第 1 加线画成虚线,长度 60px
- * - 7 个 <g class="staff-slot"> 沿 x = 200 + i*100 均匀分布
+ * - viewBox 0 0 1400 260
+ * - 5 条主线 x:80~1380;Do 的下方第 1 加线画成虚线,长度 60px
+ * - 7 个 <g class="staff-slot"> 沿 x = 200 + i*130 均匀分布 (200..980)
  *   - mi @ y=80 (line 1), sol @ y=100 (line 2), si @ y=120 (line 3)
  *   - fa @ y=90 (space 1), la @ y=110 (space 2)
  *   - re @ y=170 (下加一间), do @ y=180 (第 1 加线)
  * - 每 slot:点上方写音名 C/D/...,点下方写唱名 Do/Re/...
- * - fillNote(id):把占位圆点上色,半径 13
+ * - fillNote(id):把占位圆点上色,半径 23
  */
 import { SVG_NS } from '../utils/svg.js';
 
-const W = 1024;
-const H = 220;
+const W = 1400;
+const H = 260;
 const STAFF_TOP = 80;     // 5 线区域顶部 y(第 1 线)
 const STAFF_BOTTOM = 160; // 第 5 线 y
 const LINE_GAP = (STAFF_BOTTOM - STAFF_TOP) / 4; // 20
@@ -64,17 +64,17 @@ export class Staff {
     // 7 个 slot — 初始无文字标签,只画空心圆点
     const slots = this.notes
       .map((n, i) => {
-        const x = 200 + i * 100;
+        const x = 200 + i * 130;
         const y = POSITIONS[n.id] ?? STAFF_TOP;
         return `
           <g class="staff-slot" data-id="${n.id}">
-            <text class="staff__label staff__label--top" x="${x}" y="${y - 22}" text-anchor="middle" visibility="hidden">
+            <text class="staff__label staff__label--top" x="${x}" y="${y - 28}" text-anchor="middle" visibility="hidden">
               <tspan class="pitch">${n.note}</tspan>
             </text>
-            <circle class="staff__dot empty" cx="${x}" cy="${y}" r="14" />
-            <text class="staff__label staff__label--bot" x="${x}" y="${y + 28}" text-anchor="middle" visibility="hidden">${n.solfege}</text>
+            <circle class="staff__dot empty" cx="${x}" cy="${y}" r="20" />
+            <text class="staff__label staff__label--bot" x="${x}" y="${y + 38}" text-anchor="middle" visibility="hidden">${n.solfege}</text>
             <!-- 透明大热区,扩大拖放容差 -->
-            <circle class="staff__hit" cx="${x}" cy="${y}" r="44" fill="transparent" />
+            <circle class="staff__hit" cx="${x}" cy="${y}" r="55" fill="transparent" />
           </g>
         `;
       })
@@ -106,7 +106,7 @@ export class Staff {
   }
 
   /**
-   * 把某个 id 的占位点填上对应鱼的颜色,半径 13
+   * 把某个 id 的占位点填上对应鱼的颜色,半径 23
    * @param {string} id 'do' | 're' | 'mi' | 'fa' | 'sol' | 'la' | 'si'
    */
   fillNote(id) {
@@ -119,7 +119,7 @@ export class Staff {
     const dot = slot.querySelector('.staff__dot');
     if (!dot) return;
     dot.classList.remove('empty');
-    dot.setAttribute('r', '17');
+    dot.setAttribute('r', '23');
     // 鱼的颜色可能是 var(--fish-red) 形式,直接在 SVG 元素的 fill 上设,浏览器会解析
     dot.style.fill = note.color;
     // 归位成功后,标签永久显示
@@ -154,7 +154,7 @@ export class Staff {
       const dot = s.querySelector('.staff__dot');
       if (dot) {
         dot.classList.add('empty');
-        dot.setAttribute('r', '14');
+        dot.setAttribute('r', '20');
         dot.style.fill = '';
       }
       s.querySelectorAll('.staff__label').forEach((l) => (l.style.visibility = 'hidden'));

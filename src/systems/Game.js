@@ -434,18 +434,7 @@ export class Game {
 
   /** 显式按星数覆盖 HUD 星 (通关瞬间调用) */
   applyFinalStars() {
-    const stars = this._calcStars();
-    const starEls = document.querySelectorAll('#hud-stars .star');
-    starEls.forEach((el, i) => {
-      if (i < stars) {
-        el.textContent = '⭐';
-        el.classList.add('on');
-      } else {
-        el.textContent = '☆';
-        el.classList.remove('on');
-      }
-    });
-    return stars;
+    return this._calcStars();
   }
 
   handleWin() {
@@ -471,13 +460,12 @@ export class Game {
   // ============================================================
 
   addStar() {
-    const stars = document.querySelectorAll('#hud-stars .star');
+    const dots = document.querySelectorAll('#hud-dots .dot');
     const idx = this.placed.size - 1;
-    if (idx >= 0 && idx < stars.length) {
-      stars[idx].textContent = '⭐';
-      stars[idx].classList.remove('on');
-      void stars[idx].offsetWidth; // restart animation
-      stars[idx].classList.add('on');
+    if (idx >= 0 && idx < dots.length) {
+      dots[idx].classList.remove('on');
+      void dots[idx].offsetWidth; // restart animation
+      dots[idx].classList.add('on');
     }
   }
 
@@ -548,9 +536,8 @@ export class Game {
     if (this.staff) this.staff.reset();
     if (this.fishPool) this.fishPool.reset();
 
-    // HUD 星星先重置 (再靠后续放置点亮)
-    document.querySelectorAll('#hud-stars .star').forEach((el) => {
-      el.textContent = '☆';
+    // HUD 进度点先重置
+    document.querySelectorAll('#hud-dots .dot').forEach((el) => {
       el.classList.remove('on');
     });
 

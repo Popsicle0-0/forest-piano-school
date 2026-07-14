@@ -7,7 +7,7 @@ import { Audio } from './systems/Audio.js';
 import { Progress } from './systems/Progress.js';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v17.2';
+const APP_VERSION = 'v17.3';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -155,16 +155,16 @@ function applyPhoneLayout() {
     stage.style.overflow = 'hidden';
   }
 
-  // 键盘: 38% 高度 (比之前 32% 大), 强制 min 110px
+  // 键盘: 30% (was 38%), 强制 min 95px
   const kb = document.querySelector('.keyboard-area');
   if (kb) {
-    const kbH = Math.max(110, Math.floor(stageH * 0.38));
+    const kbH = Math.max(95, Math.floor(stageH * 0.30));
     kb.style.position = 'absolute';
     kb.style.bottom = '0';
     kb.style.left = '0';
     kb.style.right = '0';
     kb.style.height = kbH + 'px';
-    kb.style.minHeight = '110px';
+    kb.style.minHeight = '95px';
     kb.style.width = '100%';
     kb.style.background = 'rgba(255, 209, 102, 0.2)';
     kb.style.zIndex = '5';
@@ -181,18 +181,16 @@ function applyPhoneLayout() {
     }
   }
 
-  // 五线谱: 50% of (stage - keyboard), 强制 min 80px
+  // 五线谱: 50% of stage (was 55% of remaining), 强制 min 140px
   const staff = document.querySelector('.staff-wrap');
   if (staff) {
-    const kbH = Math.max(110, Math.floor(stageH * 0.38));
-    const remaining = stageH - kbH;
-    const staffH = Math.max(80, Math.floor(remaining * 0.55));
+    const staffH = Math.max(140, Math.floor(stageH * 0.50));
     staff.style.position = 'absolute';
     staff.style.top = '0';
     staff.style.left = '0';
     staff.style.right = '0';
     staff.style.height = staffH + 'px';
-    staff.style.minHeight = '80px';
+    staff.style.minHeight = '140px';
     staff.style.display = 'flex';
     staff.style.alignItems = 'center';
     staff.style.justifyContent = 'center';
@@ -206,12 +204,12 @@ function applyPhoneLayout() {
     }
   }
 
-  // 鱼池: 中间
+  // 鱼池: 剩下的 (~20%), 至少 50
   const fishPool = document.querySelector('.fish-pool');
   if (fishPool) {
-    const kbH = Math.max(110, Math.floor(stageH * 0.38));
-    const staffH = Math.max(80, Math.floor((stageH - kbH) * 0.55));
-    const fishH = Math.max(60, stageH - kbH - staffH);
+    const kbH = Math.max(95, Math.floor(stageH * 0.30));
+    const staffH = Math.max(140, Math.floor(stageH * 0.50));
+    const fishH = Math.max(50, stageH - kbH - staffH);
     fishPool.style.position = 'absolute';
     fishPool.style.bottom = kbH + 'px';
     fishPool.style.left = '0';
@@ -239,9 +237,9 @@ function applyPhoneLayout() {
  * iPad 强制布局 (v17+): 直接给元素设 inline pixel style
  * 覆盖 iPad mini 7.9" (1024×768) 到 iPad Pro 13" (1366×1024), 横竖屏
  * 检测: min(w,h) >= 700 && min(w,h) < 1400 && max(w,h) <= 1400
- * 比例:
- *   - 横屏: keyboard 38vh / staff 38vh / fish 15vh / hud 5vh / bubble 4vh
- *   - 竖屏: keyboard 35vh / staff 35vh / fish 18vh / hud 6vh / bubble 6vh
+ * 比例 (v17.3 调整):
+ *   - 横屏: keyboard 30vh / staff 50vh / fish 11vh / hud 5vh / bubble 4vh
+ *   - 竖屏: keyboard 32vh / staff 45vh / fish 11vh / hud 6vh / bubble 6vh
  * iOS PWA 的 vh 在 iPad 上偶尔算错, 用 innerHeight 换算成 px 更稳
  */
 function applyTabletLayout() {
@@ -260,20 +258,22 @@ function applyTabletLayout() {
   const isLandscape = w > h;
 
   // 比例 (vh 百分比, 总和 = 100)
+  // 横屏: keyboard 30vh / staff 50vh / fish 剩余 (kb 小, staff 大, 解决"键盘太大五线谱太小")
+  // 竖屏: keyboard 32vh / staff 45vh / fish 剩余
   let hudPct, bubblePct, kbPct, staffPct, fishPct;
   if (isLandscape) {
-    hudPct = 0.05; bubblePct = 0.04; kbPct = 0.38; staffPct = 0.38; fishPct = 0.15;
+    hudPct = 0.05; bubblePct = 0.04; kbPct = 0.30; staffPct = 0.50; fishPct = 0.11;
   } else {
-    hudPct = 0.06; bubblePct = 0.06; kbPct = 0.35; staffPct = 0.35; fishPct = 0.18;
+    hudPct = 0.06; bubblePct = 0.06; kbPct = 0.32; staffPct = 0.45; fishPct = 0.11;
   }
 
   const hudH = Math.max(40, Math.floor(h * hudPct));
   const bubbleH = Math.max(40, Math.floor(h * bubblePct));
   const kbH = Math.max(140, Math.floor(h * kbPct));
   const stageH = h - hudH - bubbleH;
-  // staff 占 (stage - keyboard) 上方, fish 浮在中间
-  const staffH = Math.max(120, Math.floor(stageH * (staffPct / (staffPct + fishPct))));
-  const fishH = Math.max(80, stageH - kbH - staffH);
+  // staff + fish 共分 (stage - keyboard) 上方, staff 大头
+  const staffH = Math.max(120, Math.floor((stageH - kbH) * (staffPct / (staffPct + fishPct))));
+  const fishH = Math.max(60, stageH - kbH - staffH);
 
   // HUD
   const hud = document.querySelector('.hud');
@@ -301,7 +301,7 @@ function applyTabletLayout() {
     stage.style.overflow = 'hidden';
   }
 
-  // 钢琴键盘 (iPad 上需要更大可见面积, 比手机 ~38vh 还多一点)
+  // 钢琴键盘 (iPad: kb 由 38vh 改为 30vh, 给 staff 腾空间)
   const kb = document.querySelector('.keyboard-area');
   if (kb) {
     kb.style.position = 'absolute';

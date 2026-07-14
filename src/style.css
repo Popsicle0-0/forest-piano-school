@@ -126,26 +126,30 @@ body::before {
   -webkit-user-select: none;
 }
 
-.hud__stars {
+.hud__dots {
   display: flex;
-  gap: 4px;
-  font-size: 28px;
-  color: var(--warm-cta);
-  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.1));
+  gap: 5px;
+  align-items: center;
 }
-
-.hud__stars .star {
-  transition: transform 200ms var(--ease-bounce);
+.hud__dots .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  transition: all 250ms var(--ease-bounce);
 }
-
-.hud__stars .star.on {
-  animation: pop 400ms var(--ease-bounce);
+.hud__dots .dot.on {
+  background: var(--warm-cta);
+  border-color: rgba(0, 0, 0, 0.4);
+  transform: scale(1.2);
+  box-shadow: 0 0 6px rgba(255, 179, 71, 0.6);
+  animation: dotPop 360ms var(--ease-bounce);
 }
-
-@keyframes pop {
-  0% { transform: scale(0.5) rotate(-20deg); }
-  60% { transform: scale(1.4) rotate(10deg); }
-  100% { transform: scale(1) rotate(0); }
+@keyframes dotPop {
+  0%   { transform: scale(0.5); }
+  60%  { transform: scale(1.5); }
+  100% { transform: scale(1.2); }
 }
 
 .hud__right {
@@ -352,21 +356,21 @@ body::before {
 
 /* 初始引导:五线谱 slot 脉冲提示 */
 .staff-slot.pulse-hint .staff__dot {
-  animation: pulseSlotDot 1.2s ease-in-out 0s 3;
+  animation: pulseSlotDot 1.4s ease-in-out 0s 3;
   transform-box: fill-box;
   transform-origin: 50% 50%;
 }
 .staff-slot.pulse-hint .staff__label {
-  animation: pulseSlotLabel 1.2s ease-in-out 0s 3;
+  animation: pulseSlotLabel 1.4s ease-in-out 0s 3;
 }
 
 @keyframes pulseSlotDot {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.8); }
+  0%, 100% { transform: scale(1); opacity: 0.18; }
+  50%      { transform: scale(1.8); opacity: 1; }
 }
 @keyframes pulseSlotLabel {
-  0%, 100% { font-weight: 800; }
-  50%      { font-weight: 900; }
+  0%, 100% { opacity: 0.5; font-weight: 800; }
+  50%      { opacity: 1; font-weight: 900; }
 }
 
 /* === 五线谱 === */
@@ -390,13 +394,13 @@ body::before {
 
 .staff__clef {
   font-family: 'ZCOOL KuaiLe', serif;
-  font-size: 84px;
+  font-size: 110px;
   fill: var(--staff-strong);
 }
 
 .staff__label {
   font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
-  font-size: 18px;
+  font-size: 22px;
   fill: var(--text-sub);
   text-anchor: middle;
 }
@@ -404,7 +408,7 @@ body::before {
 .staff__label .pitch {
   font-weight: 800;
   fill: var(--staff-strong);
-  font-size: 24px;
+  font-size: 30px;
 }
 
 .staff__dot {
@@ -419,22 +423,27 @@ body::before {
 }
 
 /* hint 高亮 (拖动时显示) */
+.staff-slot.hint {
+  filter: drop-shadow(0 0 8px rgba(255, 209, 102, 0.6));
+}
 .staff-slot.hint .staff__dot {
   opacity: 1;
   fill: #ffd166;
-  animation: slotHint 0.9s ease-in-out infinite;
+  animation: slotHintPulse 1.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
 }
 .staff-slot.hint .staff__label {
-  animation: slotLabelHint 0.9s ease-in-out infinite;
+  animation: slotLabelPulse 1.2s ease-in-out infinite;
 }
 
-@keyframes slotHint {
+@keyframes slotHintPulse {
   0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.45); }
+  50%      { transform: scale(1.35); filter: brightness(1.15); }
 }
-@keyframes slotLabelHint {
-  0%, 100% { opacity: 0.85; }
-  50%      { opacity: 1; font-weight: 900; }
+@keyframes slotLabelPulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.06); }
 }
 
 /* filled 永久显示 */
@@ -582,7 +591,8 @@ body::before {
 
 @media (max-width: 1024px) {
   .hud { padding: 10px 14px; }
-  .hud__stars { font-size: 24px; }
+  .hud__dots .dot { width: 12px; height: 12px; }
+  .hud__dots { gap: 4px; }
   .hud__btn { width: 44px; height: 44px; font-size: 20px; }
   .bubble { padding: 10px 14px; margin: 8px 12px 12px; }
   .bubble__text { font-size: 16px; }
@@ -608,7 +618,8 @@ body::before {
     background: rgba(255, 248, 236, 0.95);
     backdrop-filter: blur(8px);
   }
-  .hud__stars { font-size: 20px; gap: 2px; }
+  .hud__dots .dot { width: 10px; height: 10px; }
+  .hud__dots { gap: 3px; }
   .hud__right { gap: 6px; }
   .hud__btn { width: 38px; height: 38px; font-size: 18px; }
 
@@ -698,27 +709,33 @@ body::before {
 
 @media (max-width: 480px) {
   .fish-pool .fish { transform: scale(0.65); }
-  .hud__stars { font-size: 18px; }
+  .hud__dots .dot { width: 9px; height: 9px; }
+  .hud__dots { gap: 3px; }
   .hud__btn { width: 34px; height: 34px; font-size: 16px; }
   .bubble__text { font-size: 12px; }
   .overlay__title { font-size: 22px; }
 }
 
 @media (max-width: 920px) and (orientation: landscape) {
-  /* iPhone 16 Pro landscape: 874×402 (PWA 模式 100vh = 402)
-     关键: 键盘 height 用 32vh (= 129px on 402), 强制 min 100px */
-  .hud { height: 7vh; min-height: 32px; padding: 4px 10px; }
+  /* iPhone 16 Pro landscape: 874×402
+     v17.3: 缩短 vh 让位给 staff — 给 JS applyPhoneLayout 提供合理的 baseline
+     (JS 会立即用 innerHeight 算像素值覆盖) */
+  .hud { height: auto; min-height: 32px; padding: 4px 10px; }
   .hud__btn { width: 34px; height: 34px; font-size: 16px; }
-  .hud__stars { font-size: 18px; }
-  .bubble { height: 11vh; min-height: 40px; padding: 4px 12px; }
+  .hud__dots .dot { width: 9px; height: 9px; }
+  .hud__dots { gap: 3px; }
+  .bubble { padding: 4px 12px; margin: 0; }
   .bubble__text { font-size: 12px; }
-  .stage { height: 82vh; }
-  /* 键盘: 横屏关键! 32vh = 128px on 16 Pro, 强制可见 */
+  /* JS applyPhoneLayout 会用 innerHeight 计算并覆盖这些 inline style,
+     这里只给 CSS-only / JS-未及时运行时一个 fallback. */
   .keyboard-area.stage__kb-area {
-    height: 32vh;            /* 128px on 16 Pro landscape */
-    min-height: 100px;
+    min-height: 95px;
+    height: 95px;
   }
-  .fish-pool { bottom: 32vh; height: 16vh; min-height: 50px; }
+  .staff-wrap.stage__staff-area {
+    min-height: 140px;
+    height: 140px;
+  }
   .fish-pool .fish { transform: scale(0.55); }
 }
 
@@ -844,13 +861,14 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
    @media (max-width: 768px) 留下的 vh 值, 避免冲突 */
 @media (min-width: 768px) and (max-width: 1366px) and (min-height: 700px) {
   /* 重置 mobile 默认: 让 JS 用 innerHeight 计算的 px 值生效 */
+  /* v17.3: 同时提供 baseline min-height, 避免 JS 未运行时元素坍缩 */
   .keyboard-area.stage__kb-area {
     height: auto;
-    min-height: 0;
+    min-height: 200px;
   }
   .fish-pool {
     height: auto;
-    min-height: 0;
+    min-height: 80px;
   }
   .stage {
     /* 让 JS 用 position:absolute + top/bottom 控制; 不再依赖 grid */
@@ -858,9 +876,9 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   }
   .staff-wrap.stage__staff-area,
   .staff-wrap {
-    /* 让 JS 控制, 清除 flex */
+    /* 让 JS 控制, 清除 flex, 提供 baseline min-height */
     height: auto;
-    min-height: 0;
+    min-height: 250px;
     margin: 0;
   }
 
