@@ -18,6 +18,9 @@
 import { Staff } from '../components/Staff.js';
 import { PianoKeyboard } from '../components/PianoKeyboard.js';
 import { FishPool } from '../components/FishPool.js';
+// v18: 成就系统
+import { AchievementSystem } from './Achievements.js';
+import { AchievementToast } from '../components/AchievementToast.js';
 
 // v17.8+: 多关卡注册表. 自动扫描 src/systems/Level*.js, 每个文件 default 导出
 // 一个 (game) => teardownFn 的启动函数. Game.start({levelId}) 通过本表分发.
@@ -65,6 +68,8 @@ export class Game {
     this.bubble = bubbleEl;
     this.progress = progress;
     this.audio = audio;
+    // v18: 成就系统 (在 progress 之后)
+    this.achievements = new AchievementSystem(this.progress);
     this.placed = new Set();
     this.wrongCount = 0;           // v16: 错误数 (算星用)
     this.hasTappedFish = false;    // v16: 是否单击听过鱼声
@@ -687,6 +692,18 @@ export class Game {
     // 关掉已有 overlay
     document.querySelectorAll('.overlay').forEach((el) => el.remove());
 
+    // v18: 检查新解锁的成就 + 推 toast (通关瞬间触发)
+    if (this.achievements) {
+      try {
+        const newly = this.achievements.checkAndUnlock();
+        newly.forEach((def, i) => {
+          setTimeout(() => {
+            try { AchievementToast.show(def); } catch (_) {}
+          }, 1500 + i * 800);  // 错开 0.8s 避免重叠
+        });
+      } catch (_) {}
+    }
+
     const starIcons = [0, 1, 2].map((i) =>
       `<span class="win-star ${i < stars ? 'on' : ''}">${i < stars ? '⭐' : '☆'}</span>`
     ).join('');
@@ -728,6 +745,7 @@ export class Game {
 
         <div class="overlay__btns">
           <button class="btn-secondary" id="replay-btn">↻ 再玩一次</button>
+          <button class="btn-secondary" id="achievements-btn">🏆 成就</button>
           <button class="btn-primary" id="next-btn">下一关 ›</button>
         </div>
       </div>
@@ -754,6 +772,27 @@ export class Game {
       overlay.remove();
       this.start({ levelId: wonLevel });
     };
+
+    // v18: 成就墙按钮 - 动态 import 避免循环依赖
+    const achBtn = overlay.querySelector('#achievements-btn');
+    if (achBtn) {
+      achBtn.onclick = async () => {
+        try {
+          const { AchievementsWall } = await import('../components/AchievementsWall.js');
+          overlay.remove();
+          const wall = new AchievementsWall(document.body, {
+            achievementSystem: this.achievements,
+            onClose: () => {
+              // 关掉成就墙后回到结束 overlay
+              this.showWinOverlay(stars, wonLevel);
+            },
+          });
+          wall.show();
+        } catch (err) {
+          console.warn('[achievements] 打开成就墙失败:', err);
+        }
+      };
+    }
   }
 
   /** 全部关卡完成: 庆祝 + 预告更多关卡 */

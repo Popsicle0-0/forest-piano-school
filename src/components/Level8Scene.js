@@ -83,25 +83,27 @@ export class Level8Scene {
   }
 
   /**
-   * 渲染 3 个曲目卡片到指定容器, 点击触发 onSelect(song).
+   * 渲染 6 个曲目卡片到指定容器, 点击触发 onSelect(song).
+   * 包含难度 (★ / ★★ / ★★★) 标识, 供孩子直观看到曲子难度.
    * @param {HTMLElement} container
-   * @param {(song: {id:string,name:string,emoji:string,melody:string[]}) => void} onSelect
+   * @param {(song: {id:string,name:string,emoji:string,diff:string,difficulty:number,melody:string[]}) => void} onSelect
    */
   showSongSelector(container, onSelect) {
     const songs = [
-      { id: 'twinkle', name: '小星星', emoji: '⭐',
-        melody: ['C4','C4','G4','G4','A4','A4','G4','F4','F4','E4','E4','D4','D4','C4'] },
-      { id: 'joy', name: '欢乐颂', emoji: '🎉',
-        melody: ['E4','E4','F4','G4','G4','F4','E4','D4','C4','C4','D4','E4','E4','D4','D4'] },
-      { id: 'bridge', name: '伦敦桥', emoji: '🌉',
-        melody: ['C4','D4','E4','F4','G4','G4','A4','G4','F4','E4','D4','C4'] },
+      { id: 'twinkle',  name: '小星星',   emoji: '⭐',  diff: '★',   difficulty: 1, melody: ['C4','C4','G4','G4','A4','A4','G4','F4','F4','E4','E4','D4','D4','C4'] },
+      { id: 'birthday', name: '生日快乐', emoji: '🎂',  diff: '★',   difficulty: 1, melody: ['C4','C4','D4','C4','F4','E4','C4','C4','D4','C4','G4','F4'] },
+      { id: 'london',   name: '伦敦桥',   emoji: '🌉',  diff: '★★',  difficulty: 2, melody: ['C4','D4','E4','F4','G4','G4','A4','G4','F4','E4','D4','C4'] },
+      { id: 'joy',      name: '欢乐颂',   emoji: '🎉',  diff: '★★',  difficulty: 2, melody: ['E4','E4','F4','G4','G4','F4','E4','D4','C4','C4','D4','E4','E4','D4','D4'] },
+      { id: 'frog',     name: '小青蛙',   emoji: '🐸',  diff: '★★',  difficulty: 2, melody: ['C4','D4','E4','F4','E4','D4','C4'] },
+      { id: 'molihua',  name: '茉莉花',   emoji: '🌸',  diff: '★★★', difficulty: 3, melody: ['C4','E4','G4','A4','G4','E4','C4','D4','E4','F4','E4','D4','C4'] },
     ];
 
     const html = songs.map((s) => `
-      <button class="level8-song-card" data-song="${s.id}">
+      <button class="level8-song-card level8-diff-${s.difficulty}" data-song="${s.id}">
         <div class="level8-song-emoji">${s.emoji}</div>
         <div class="level8-song-name">${s.name}</div>
         <div class="level8-song-len">${s.melody.length} 音</div>
+        <div class="level8-song-diff">${s.diff}</div>
       </button>
     `).join('');
 

@@ -1,15 +1,18 @@
 /**
  * Level 8: 森林音乐会 + 舞台
  *
- * 选曲 → 视奏完整旋律 (类似 Level 5 但可选 3 首曲目)
- *   - 曲目 1: 小星星  (14 音)
- *   - 曲目 2: 欢乐颂  (15 音)
- *   - 曲目 3: 伦敦桥  (12 音)
+ * 选曲 → 视奏完整旋律 (类似 Level 5 但可选 6 首曲目, 分 3 档难度)
+ *   - ★ 入门 (diff 1): 小星星 (14) / 生日快乐 (12)
+ *   - ★★ 中等 (diff 2): 伦敦桥 (12) / 欢乐颂 (15) / 小青蛙 (7)
+ *   - ★★★ 进阶 (diff 3): 茉莉花 (13)
  *
  * 音符泡泡从五线谱位置缓慢下落, 孩子在泡泡到琴键时按对应白键.
  *   正确 = 泡泡放大消失 + 下一个音
  *   错音 = 泡泡变红闪烁 + 回放正确音 + 计数错
  *   漏敲 (泡泡掉完) = 计数错 + 换下个音
+ *
+ * 通关星数随难度放宽 (diff 2 容许更多错, diff 3 容许最多 10 错仍 1⭐).
+ * 集齐 6 首演奏过 → 选曲界面右上角显示"全部演奏!"徽章 (localStorage).
  */
 import { Level8Scene } from '../components/Level8Scene.js';
 import { PianoKeyboard } from '../components/PianoKeyboard.js';
@@ -60,6 +63,30 @@ export default function startLevel8(game) {
   // 2) 选曲 UI 容器
   game.stage.insertAdjacentHTML('beforeend', '<div class="level8-song-stage"></div>');
   const songStage = game.stage.querySelector('.level8-song-stage');
+
+  // localStorage: 跟踪用户已演奏过的曲目 (用于"全部演奏!"徽章)
+  const PLAYED_KEY = 'fps_level8_played_v1';
+  function getPlayedSet() {
+    try {
+      const raw = localStorage.getItem(PLAYED_KEY);
+      if (!raw) return new Set();
+      const arr = JSON.parse(raw);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch (_) { return new Set(); }
+  }
+  function markSongPlayed(id) {
+    const set = getPlayedSet();
+    set.add(id);
+    try { localStorage.setItem(PLAYED_KEY, JSON.stringify(Array.from(set))); } catch (_) {}
+  }
+
+  // 渲染 selector 时检查是否 6 首全打过 → 显示"全部演奏!"徽章
+  const playedSet = getPlayedSet();
+  if (playedSet.size >= 6) {
+    songStage.insertAdjacentHTML('beforeend',
+      '<div class="level8-all-played-badge">🎖 全部演奏!</div>');
+  }
+
   game.scene.showSongSelector(songStage, (song) => startSong(song));
 
   // 3) 钢琴键盘 (整个关卡期间常驻)
@@ -104,12 +131,13 @@ export default function startLevel8(game) {
   }
 
   function startSong(song) {
-    // 选完曲后: 收起歌曲卡片, 显示现在播什么 + 进度
+    // 选完曲后: 收起歌曲卡片, 显示现在播什么 + 难度 + 进度
     if (songStage) {
       songStage.innerHTML = `
         <div class="level8-now-playing">
           <div class="level8-now-emoji">${song.emoji}</div>
           <div class="level8-now-text">演奏: <strong>${song.name}</strong></div>
+          <div class="level8-difficulty-badge level8-diff-${song.difficulty}">难度 ${song.diff}</div>
           <div class="level8-progress">1 / ${song.melody.length}</div>
         </div>
       `;
@@ -118,6 +146,9 @@ export default function startLevel8(game) {
     if (!staffArea) buildStaffArea();
 
     game.say(`演奏《${song.name}》! 跟着音符按琴键~`);
+    // 标记该曲已被演奏过 (用于"全部演奏!"徽章)
+    markSongPlayed(song.id);
+    game._level8Song = song;
     game._level8Seq = [...song.melody];
     game._level8Total = game._level8Seq.length;
     game._level8Correct = 0;
@@ -229,7 +260,25 @@ export default function startLevel8(game) {
   };
 
   function handleWin() {
-    const stars = (game._calcStars && game._calcStars()) || Math.max(1, 3 - Math.floor((game.wrongCount || 0) / 3));
+    // 当前曲的难度 (从 game._level8Song 拿), 用于星数公式
+    const currentSong = game._level8Song;
+    const diff = (currentSong && currentSong.difficulty) || 1;
+    const wc = game.wrongCount || 0;
+
+    // 难度感知星数公式
+    let stars;
+    if (diff <= 1) {
+      // diff 1: 与 Game._calcStars 一致 (0=3⭐, 1-2=2⭐, 3-5=1⭐, 6+=0⭐)
+      stars = (game._calcStars && game._calcStars()) ||
+        (wc <= 0 ? 3 : wc <= 2 ? 2 : wc <= 5 ? 1 : 0);
+    } else if (diff === 2) {
+      // diff 2: 0=3⭐, 1-3=2⭐, 4-7=1⭐, 8+=0⭐
+      stars = (wc <= 0) ? 3 : (wc <= 3) ? 2 : (wc <= 7) ? 1 : 0;
+    } else {
+      // diff 3: 0-1=3⭐, 2-4=2⭐, 5-9=1⭐, 10+=0⭐
+      stars = (wc <= 1) ? 3 : (wc <= 4) ? 2 : (wc <= 9) ? 1 : 0;
+    }
+
     try { game.progress.markLevelComplete(8, stars); } catch (_) {}
     try { game.audio.playScale(['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4']); } catch (_) {}
 
@@ -258,6 +307,8 @@ export default function startLevel8(game) {
       game._level8Timeouts.forEach((id) => clearTimeout(id));
       game._level8Timeouts = [];
     }
+
+    game._level8Song = null;
 
     // 拆场景
     if (game.scene) {

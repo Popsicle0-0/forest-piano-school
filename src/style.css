@@ -1531,52 +1531,114 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   text-shadow: 0 0 8px rgba(255, 209, 102, 0.5);
 }
 .level8-song-cards {
-  display: flex;
-  gap: 14px;
-  justify-content: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  justify-items: center;
+  max-width: 540px;
+  margin: 0 auto;
 }
 .level8-song-card {
   background: rgba(15, 10, 30, 0.85);
   border: 3px solid rgba(255, 235, 100, 0.5);
   border-radius: 20px;
-  padding: 14px 18px;
+  padding: 12px 14px;
   cursor: pointer;
   font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
   text-align: center;
   color: white;
   transition: transform 200ms ease-out, box-shadow 200ms;
-  min-width: 96px;
+  width: 100%;
+  max-width: 150px;
   pointer-events: auto;
+  position: relative;
 }
 .level8-song-card:hover,
 .level8-song-card:active {
   transform: scale(1.05);
   box-shadow: 0 0 24px rgba(255, 235, 100, 0.4);
 }
+.level8-song-card.level8-diff-1 {
+  border-color: rgba(144, 238, 144, 0.6);  /* 浅绿 = 简单 */
+}
+.level8-song-card.level8-diff-2 {
+  border-color: rgba(255, 209, 102, 0.7);  /* 金黄 = 中等 */
+}
+.level8-song-card.level8-diff-3 {
+  border-color: rgba(255, 107, 107, 0.75); /* 红橙 = 难 */
+}
 .level8-song-emoji {
-  font-size: 44px;
-  margin-bottom: 6px;
+  font-size: 36px;
+  margin-bottom: 4px;
   line-height: 1;
 }
 .level8-song-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
 }
 .level8-song-len {
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(255, 235, 100, 0.7);
-  margin-top: 4px;
+  margin-top: 2px;
+}
+.level8-song-diff {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: rgba(255, 235, 100, 0.95);
+  letter-spacing: 1px;
+}
+.level8-difficulty-badge {
+  font-size: 13px;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+  background: rgba(144, 238, 144, 0.18);
+  color: rgba(144, 238, 144, 0.95);
+  border: 1px solid rgba(144, 238, 144, 0.5);
+}
+.level8-difficulty-badge.level8-diff-2 {
+  background: rgba(255, 209, 102, 0.18);
+  color: rgba(255, 209, 102, 0.95);
+  border-color: rgba(255, 209, 102, 0.5);
+}
+.level8-difficulty-badge.level8-diff-3 {
+  background: rgba(255, 107, 107, 0.2);
+  color: rgba(255, 150, 150, 0.98);
+  border-color: rgba(255, 107, 107, 0.55);
+}
+.level8-all-played-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: linear-gradient(135deg, #ffd166, #ff9f1c);
+  color: #1a1420;
+  font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 6px 12px;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(255, 159, 28, 0.4);
+  z-index: 25;
+  animation: pulseBadge 1.6s ease-in-out infinite;
+}
+@keyframes pulseBadge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
 }
 .level8-now-playing {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   justify-content: center;
+  flex-wrap: wrap;
   background: rgba(15, 10, 30, 0.85);
   border: 2px solid rgba(255, 235, 100, 0.4);
   border-radius: 16px;
-  padding: 10px 18px;
+  padding: 10px 16px;
   font-family: 'ZCOOL KuaiLe', 'Baloo 2', sans-serif;
 }
 .level8-now-emoji {
@@ -2224,4 +2286,457 @@ button:active:not(:disabled),
 @keyframes birdFloat {
   0%, 100% { transform: translateX(0) translateY(0); }
   50%      { transform: translateX(8px) translateY(-6px); }
+}
+
+/* === v18: Level 9 黑键世界 === */
+.level9-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    #1a0a3a 0%,
+    #2a0a55 30%,
+    #3d0a55 60%,
+    #2a0a3a 90%,
+    #0a0510 100%);
+  z-index: 1;
+}
+.level9-background svg { width: 100%; height: 100%; }
+.level9-title {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 36px;
+  font-weight: 900;
+  fill: rgba(255, 220, 100, 0.95);
+  filter: drop-shadow(0 0 12px rgba(255, 209, 102, 0.6));
+}
+.level9-subtitle {
+  font-family: 'Nunito', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  fill: rgba(255, 255, 255, 0.85);
+}
+.level9-twinkle {
+  animation: starTwinkle9 3s ease-in-out infinite;
+}
+@keyframes starTwinkle9 {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+.level9-keys-container {
+  position: absolute;
+  bottom: 100px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 16px;
+  z-index: 10;
+}
+.level9-key {
+  position: relative;
+  width: 110px;
+  height: 70px;
+  border: 3px solid rgba(155, 93, 229, 0.5);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #2a1a4a, #1a0a3a);
+  color: white;
+  cursor: pointer;
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 -4px 8px rgba(155, 93, 229, 0.3);
+  transition: transform 100ms, border-color 200ms;
+  -webkit-tap-highlight-color: transparent;
+}
+.level9-key__label {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+.level9-key__ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: radial-gradient(circle, rgba(155, 93, 229, 0.7), transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+.level9-key.pressed {
+  transform: translateY(2px) scale(0.96);
+  border-color: var(--warm-cta);
+  background: linear-gradient(180deg, #3a2a55, #2a1a4a);
+}
+.level9-key.shake {
+  animation: shake9 360ms ease-in-out;
+}
+@keyframes shake9 {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px) rotate(-2deg); }
+  40% { transform: translateX(6px) rotate(2deg); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+/* === Level 9 entry in LevelMap (主题色) === */
+.level-map-tile[data-id="9"] {
+  background: linear-gradient(135deg, #2a0a55, #1a0a3a);
+  color: white;
+}
+.level-map-tile[data-id="9"] * {
+  color: white !important;
+}
+
+/* === v18: 设置面板 === */
+.settings-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 10, 30, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 250;
+  animation: fadeIn 300ms;
+}
+.settings-panel__card {
+  background: var(--bg-cream);
+  border-radius: var(--r-lg);
+  padding: 28px 32px;
+  max-width: 600px;
+  width: 92%;
+  max-height: 88vh;
+  overflow-y: auto;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+.settings-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.settings-panel__title {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--staff-strong);
+}
+.settings-panel__section {
+  margin-bottom: 22px;
+  text-align: left;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--r-md);
+}
+.settings-panel__section-title {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--staff-strong);
+  margin-bottom: 8px;
+}
+.settings-panel__desc {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin: 6px 0 12px;
+}
+.settings-panel__about {
+  font-size: 14px;
+  color: var(--staff-strong);
+  line-height: 1.6;
+}
+.settings-panel__credits {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+.settings-panel__levels {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.settings-panel__levels li {
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+.settings-panel__levels li:last-child {
+  border-bottom: none;
+}
+
+/* ============================================================
+ * v18: 成就系统 — 成就墙 + 解锁通知 Toast
+ * ============================================================ */
+
+.achievements-wall {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 10, 30, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: achievements-fade-in 400ms ease-out;
+  padding: 16px;
+}
+
+@keyframes achievements-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.achievements-wall__card {
+  background: var(--bg-cream);
+  border-radius: var(--r-lg);
+  padding: 28px 32px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  animation: achievements-card-in 500ms var(--ease-bounce);
+}
+
+@keyframes achievements-card-in {
+  from { transform: translateY(40px) scale(0.92); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.achievements-wall__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.achievements-wall__title {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--staff-strong);
+}
+
+.achievements-wall__close {
+  font-size: 16px;
+  padding: 8px 18px;
+}
+
+.achievements-wall__progress {
+  margin-bottom: 24px;
+}
+
+.achievements-wall__progress-text {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 16px;
+  color: var(--text-sub);
+  margin-bottom: 8px;
+}
+
+.achievements-wall__progress-bar {
+  width: 100%;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.achievements-wall__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--warm-cta), #ffd166);
+  border-radius: 7px;
+  transition: width 600ms ease-out;
+}
+
+.achievements-wall__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.achievement-badge {
+  padding: 14px 10px;
+  border-radius: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+  text-align: center;
+  transition: transform 240ms var(--ease-out-soft), box-shadow 240ms;
+}
+
+.achievement-badge.unlocked {
+  border-color: var(--warm-cta);
+  background: linear-gradient(135deg, rgba(255, 235, 168, 0.4), rgba(255, 209, 102, 0.25));
+  box-shadow: 0 6px 16px rgba(255, 179, 71, 0.3);
+  animation: badge-unlock-pop 600ms var(--ease-bounce);
+}
+
+.achievement-badge.locked {
+  opacity: 0.55;
+  filter: grayscale(0.7);
+}
+
+.achievement-badge:hover {
+  transform: translateY(-3px);
+}
+
+@keyframes badge-unlock-pop {
+  0%   { transform: scale(0.85); }
+  50%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+.achievement-badge__emoji {
+  font-size: 42px;
+  line-height: 1;
+  margin-bottom: 6px;
+  /* 防止 emoji 字体在 Web 字体之外变灰 */
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+}
+
+.achievement-badge__name {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--staff-strong);
+  margin-bottom: 4px;
+}
+
+.achievement-badge__desc {
+  font-size: 11px;
+  color: var(--text-sub);
+  line-height: 1.3;
+  min-height: 28px;
+}
+
+.achievement-badge__state {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+}
+
+.achievement-badge__state:not(.state-locked) {
+  color: var(--good);
+}
+
+.achievement-badge__state.state-locked {
+  color: var(--text-sub);
+  opacity: 0.65;
+}
+
+/* ============================================================
+ * 解锁通知 Toast - 屏幕底部冒出
+ * ============================================================ */
+
+.achievement-toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(120px);
+  background: linear-gradient(135deg, #ffd166, #ffb347);
+  color: #3d405b;
+  border-radius: 16px;
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 8px 24px rgba(255, 179, 71, 0.5);
+  z-index: 300;
+  opacity: 0;
+  max-width: 92vw;
+  transition: transform 400ms var(--ease-bounce), opacity 400ms ease;
+  pointer-events: none;
+}
+
+.achievement-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.achievement-toast.hide {
+  transform: translateX(-50%) translateY(80px);
+  opacity: 0;
+}
+
+.achievement-toast__icon {
+  font-size: 36px;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  flex-shrink: 0;
+}
+
+.achievement-toast__title {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  color: rgba(0, 0, 0, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.achievement-toast__name {
+  font-family: 'ZCOOL KuaiLe', sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.achievement-toast__desc {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.7);
+  margin-top: 2px;
+}
+
+/* ============================================================
+ * HUD 右上角 🏆 按钮 (动态插入; 沿用 hud__btn 视觉, 这里微调间距)
+ * ============================================================ */
+
+.hud__right #btn-achievements {
+  /* 颜色与其他 hud__btn 一致, 让 emoji 加一点点阴影增强识别 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.hud__right #btn-achievements.pulse-hint {
+  animation: achievements-hud-pulse 1.6s ease-in-out 3;
+}
+
+@keyframes achievements-hud-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(255, 209, 102, 0.5); }
+}
+
+/* ============================================================
+ * 响应式 — 小屏网格改 2 列
+ * ============================================================ */
+
+@media (max-width: 600px) {
+  .achievements-wall__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .achievements-wall__card {
+    padding: 20px 16px;
+  }
+  .achievements-wall__title {
+    font-size: 22px;
+  }
+  .achievement-badge__emoji {
+    font-size: 36px;
+  }
+}
+
+@media (max-width: 380px) {
+  .achievements-wall__grid {
+    grid-template-columns: 1fr;
+  }
 }

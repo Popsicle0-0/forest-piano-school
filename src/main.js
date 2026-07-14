@@ -4,10 +4,12 @@
  */
 import { Game } from './systems/Game.js';
 import { Audio } from './systems/Audio.js';
+import { BGM } from './systems/BGM.js';
 import { Progress } from './systems/Progress.js';
+import { SettingsPanel } from './components/SettingsPanel.js';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.0';
+const APP_VERSION = 'v18.1';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -37,6 +39,9 @@ function boot() {
     audio: new Audio(),
   });
 
+  // BGM (默认关闭)
+  const bgm = new BGM(game.audio);
+
   // 启动关卡 1
   game.start({ levelId: 1 });
 
@@ -59,9 +64,10 @@ function boot() {
   setTimeout(applyPhoneLayout, 1500);
   setTimeout(applyTabletLayout, 1500);
 
-  // ====== 右上角按钮: 声音 / 重玩 / 主页 ======
+  // ====== 右上角按钮: 声音 / 重玩 / BGM / 主页 ======
   const btnSound = document.getElementById('btn-sound');
   const btnReplay = document.getElementById('btn-replay');
+  const btnBGM = document.getElementById('btn-bgm');
   const btnHome = document.getElementById('btn-home');
   if (btnSound) {
     btnSound.addEventListener('click', () => {
@@ -75,12 +81,61 @@ function boot() {
       try { game.restartLevel(); } catch (err) { console.warn('restart 失败:', err); }
     });
   }
+  if (btnBGM) {
+    btnBGM.addEventListener('click', () => {
+      const on = bgm.toggle();
+      btnBGM.textContent = on ? '🎶' : '🔇';
+      btnBGM.style.background = on ? 'rgba(255, 235, 168, 0.4)' : '';
+    });
+  }
   if (btnHome) {
     btnHome.addEventListener('click', () => {
       // 回到开始遮罩
       if (confirm('回到开始画面?')) {
         location.reload();
       }
+    });
+  }
+
+  // settings button
+  const btnSettings = document.createElement('button');
+  btnSettings.className = 'hud__btn';
+  btnSettings.id = 'btn-settings';
+  btnSettings.setAttribute('aria-label', '设置');
+  btnSettings.setAttribute('title', '设置');
+  btnSettings.textContent = '⚙';
+  document.querySelector('.hud__right')?.appendChild(btnSettings);
+
+  btnSettings.addEventListener('click', () => {
+    const panel = new SettingsPanel(document.body, {
+      version: APP_VERSION,
+      onReset: () => location.reload(),
+      onClose: () => {},
+    });
+    panel.show();
+  });
+
+  // ====== v18: 成就墙按钮 (HUD 右上角, 动态插入, 不动 index.html) ======
+  const hudRight = document.querySelector('.hud__right');
+  if (hudRight && !document.getElementById('btn-achievements')) {
+    const btnAch = document.createElement('button');
+    btnAch.className = 'hud__btn';
+    btnAch.id = 'btn-achievements';
+    btnAch.setAttribute('aria-label', '成就墙');
+    btnAch.title = '成就墙';
+    btnAch.textContent = '🏆';
+    // 插在首位, 让玩家最容易点到 (在 🔊 ↻ ⌂ 之前)
+    hudRight.insertBefore(btnAch, hudRight.firstChild);
+
+    btnAch.addEventListener('click', () => {
+      // 动态 import, 避免循环依赖 + 减小首屏体积
+      import('./components/AchievementsWall.js').then(({ AchievementsWall }) => {
+        const wall = new AchievementsWall(document.body, {
+          achievementSystem: game.achievements,
+          onClose: () => {},
+        });
+        wall.show();
+      }).catch((err) => console.warn('[achievements] 加载失败:', err));
     });
   }
 
