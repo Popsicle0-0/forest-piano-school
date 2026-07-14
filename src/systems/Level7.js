@@ -19,6 +19,7 @@
  */
 import { Level7Scene } from '../components/Level7Scene.js';
 import { FishPool } from '../components/FishPool.js';
+import { particles } from '../components/Particles.js';
 import { gsap } from 'gsap';
 
 // 7 音元数据 (跟 Game.js / Level3.js 完全一致)
@@ -149,6 +150,13 @@ export default function startLevel7(game) {
         onComplete: () => {
           // 锁定这条鱼
           try { game.fishPool.lockFish(id); } catch (_) {}
+          // 台阶点亮 — 用鱼的唱名色 (CSS .level7-step-lit 读取 --step-lit-color)
+          try {
+            targetEl.style.setProperty('--step-lit-color', ribbonColor);
+            targetEl.classList.add('level7-step-lit');
+          } catch (_) {}
+          // 答对彩纸喷泉 — 从台阶迸发 (颜色 = 鱼色)
+          try { particles.fountain({ x: tx, y: ty, color: ribbonColor }); } catch (_) {}
           // 节点变绿闪烁
           try {
             gsap.fromTo(
@@ -162,6 +170,21 @@ export default function startLevel7(game) {
             try { game.audio.playNote(fishNote.pitch); } catch (_) {}
             try { game._floatScore(fx, fy, `${fishNote.solfege} ✓`); } catch (_) {}
           }
+          // 树屋顶上的小鸟"叽"一声 — 用 audio.hover 合成一个小音 (跟着放对的音)
+          try {
+            setTimeout(() => { try { game.audio.hover(id); } catch (_) {} }, 220);
+          } catch (_) {}
+          // 小鸟视觉抖动一下 (呼应"叫一声")
+          try {
+            const chirpBird = game.scene.background.querySelector('.level7-birds path');
+            if (chirpBird) {
+              gsap.fromTo(
+                chirpBird,
+                { y: 0 },
+                { y: -6, duration: 0.12, yoyo: true, repeat: 3, ease: 'sine.inOut', overwrite: true }
+              );
+            }
+          } catch (_) {}
           // 鱼摇摆庆祝
           gsap.to(fish, {
             rotation: '+=8',

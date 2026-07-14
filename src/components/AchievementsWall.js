@@ -9,7 +9,6 @@
  *   });
  *   wall.show();
  */
-import { ACHIEVEMENT_DEFS } from '../systems/Achievements.js';
 
 export class AchievementsWall {
   /**

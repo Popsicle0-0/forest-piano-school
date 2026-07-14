@@ -1,5 +1,3 @@
-import { SVG_NS } from '../utils/svg.js';
-
 /**
  * 关卡地图选择器 - 8 关卡的网格
  */
@@ -17,6 +15,9 @@ export const LEVEL_META = [
   { id: 11, name: '翻牌记忆',       emoji: '🎴', desc: '翻开两张牌找一样的朋友',      theme: '#d96e8a' },
   { id: 12, name: '番茄节奏',       emoji: '🥁', desc: '跟着摆杆切菜 — 命中节拍!',   theme: '#c0392b' },
   { id: 13, name: '节奏大师',       emoji: '⏱️', desc: '跟随节拍器逐渐加速,敲准 30 拍', theme: '#8b4513' },
+  { id: 14, name: '和弦建造',       emoji: '🎶', desc: '拖三只鱼组成 C 大调',         theme: '#9b5de5' },
+  { id: 15, name: '视奏大师',       emoji: '🎼', desc: '快速读谱 + 按键',              theme: '#457b9d' },
+  { id: 16, name: '节奏阶梯',       emoji: '🚀', desc: '速度阶梯挑战',                 theme: '#f4a261' },
 ];
 
 export class LevelMap {

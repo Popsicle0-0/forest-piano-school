@@ -174,6 +174,10 @@ export class Game {
       try { this._teardownCurrentLevel(); } catch (_) {}
       this._teardownCurrentLevel = null;
     }
+    // 杀掉所有还在响的 osc + 缓冲源 — 避免长 envelope 的钢琴尾音跨越关卡
+    if (this.audio && typeof this.audio.stop === 'function') {
+      try { this.audio.stop(); } catch (_) {}
+    }
 
     const starter = levelStarters.get(levelId);
     if (starter) {
@@ -878,12 +882,36 @@ export class Game {
 
         <div class="overlay__btns">
           <button class="btn-secondary" id="replay-btn">↻ 再玩一次</button>
+          <button class="btn-secondary" id="win-share-btn">📤 分享</button>
           <button class="btn-secondary" id="achievements-btn">🏆 成就</button>
           <button class="btn-primary" id="next-btn">下一关 ›</button>
         </div>
       </div>
     `;
     document.body.appendChild(overlay);
+
+    // v18.5: 分享按钮 — 动态 import Share.js 避免循环依赖
+    const shareBtn = overlay.querySelector('#win-share-btn');
+    if (shareBtn) {
+      shareBtn.onclick = async () => {
+        try {
+          const { Share } = await import('../components/Share.js');
+          const share = new Share(this);
+          // 共享菜单打开时把 win overlay 隐藏,关掉后回到底层
+          overlay.style.display = 'none';
+          share.showShareMenu({
+            levelId: wonLevel,
+            stars,
+            wrongCount: this.wrongCount,
+            totalQuestions: wonLevel === 2 ? (this._level2Total || 5) : 7,
+          }, () => {
+            overlay.style.display = '';
+          });
+        } catch (err) {
+          console.warn('[share] 打开分享菜单失败:', err);
+        }
+      };
+    }
 
     const nextBtn = overlay.querySelector('#next-btn');
     if (wonLevel === 1) {

@@ -18,7 +18,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.5';
+const APP_VERSION = 'v18.6';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -177,6 +177,24 @@ function boot() {
         });
         wall.show();
       }).catch((err) => console.warn('[achievements] 加载失败:', err));
+    });
+  }
+
+  // ====== v18.6: 🎹 自由演奏按钮 (HUD 右上角, 沙盒模式, 无评分) ======
+  if (hudRight && !document.getElementById('btn-practice')) {
+    const btnPractice = document.createElement('button');
+    btnPractice.className = 'hud__btn';
+    btnPractice.id = 'btn-practice';
+    btnPractice.setAttribute('aria-label', '自由演奏');
+    btnPractice.title = '自由演奏';
+    btnPractice.textContent = '🎹';
+    hudRight.appendChild(btnPractice);
+
+    btnPractice.addEventListener('click', () => {
+      import('./components/PracticeRoom.js').then(({ PracticeRoom }) => {
+        const room = new PracticeRoom(document.body, game);
+        room.show();
+      }).catch((err) => console.warn('[practice] 加载失败:', err));
     });
   }
 

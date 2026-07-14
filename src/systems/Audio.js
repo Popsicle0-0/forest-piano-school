@@ -17,6 +17,38 @@
  *  - playScale(pitches)     - 通关上行 7 音
  *  - toggleMute()           - 切静音
  */
+
+/**
+ * 所有可调声学常量集中在此. 改一处即可全局生效.
+ * 命名规则: <子系统>_<参数>. 改动前请确认 iOS PWA 真机无爆音/截幅.
+ */
+const CONSTS = {
+  MASTER_GAIN_NORMAL: 0.75,
+  MASTER_GAIN_MUTED: 0,
+  TEST_BEEP_PEAK: 0.6,
+  PLAYNOTE_ATTACK: 0.65,
+  PLAYNOTE_DECAY: 0.35,
+  PLAYNOTE_RELEASE: 0.8,
+  PLAYNOTE_HARMONIC_2: 0.15,
+  PLAYNOTE_HARMONIC_3: 0.05,
+  PLAYNOTE_HARMONIC_4: 0.03,
+  PLAYNOTE_HARMONIC_5: 0.015,
+  HOVER_PEAK: 0.35,
+  CORRECT_PEAK: 0.55,
+  WRONG_PEAK: 0.45,
+  ARPEGGIO_DEFAULT_PEAK: 0.5,
+  REVERB_BUS_GAIN: 0.18,
+  REVERB_WET: 1.0,
+  REVERB_FEEDBACK: 0.4,
+  REVERB_DELAY: 0.25,
+  REVERB_SEND: 0.20,
+  HAMMER_NOISE_PEAK: 0.15,
+  HAMMER_NOISE_DURATION: 0.05,
+  ADSR_ATTACK: 0.01,
+  ADSR_DECAY: 0.15,
+  ADSR_RELEASE: 0.85,
+};
+
 export class Audio {
   constructor() {
     this.unlocked = false;
@@ -105,7 +137,7 @@ export class Audio {
       if (!this._webAudio) {
         this._webAudio = new Ctx();
         this._masterGain = this._webAudio.createGain();
-        this._masterGain.gain.value = 0.75;
+        this._masterGain.gain.value = CONSTS.MASTER_GAIN_NORMAL;
         this._masterGain.connect(this._webAudio.destination);
         this._setupReverb();
       }
@@ -148,7 +180,7 @@ export class Audio {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(523.25, t);  // C5
       gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.6, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(CONSTS.TEST_BEEP_PEAK, t + 0.01);
       gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
       osc.connect(gain).connect(this._masterGain);
       osc.start(t);
@@ -200,15 +232,15 @@ export class Audio {
 
     // 主混响发送总线
     this._reverbBus = ctx.createGain();
-    this._reverbBus.gain.value = 0.18;
+    this._reverbBus.gain.value = CONSTS.REVERB_BUS_GAIN;
 
     // 主延迟 (250ms) + 自反馈 0.4, 形成"大厅"感
     this._reverbDelay = ctx.createDelay(1.0);
-    this._reverbDelay.delayTime.value = 0.25;
+    this._reverbDelay.delayTime.value = CONSTS.REVERB_DELAY;
     const feedback = ctx.createGain();
-    feedback.gain.value = 0.4;
+    feedback.gain.value = CONSTS.REVERB_FEEDBACK;
     const wet = ctx.createGain();
-    wet.gain.value = 1.0;
+    wet.gain.value = CONSTS.REVERB_WET;
 
     // 反馈环路
     this._reverbBus.connect(this._reverbDelay);
@@ -241,7 +273,7 @@ export class Audio {
     if (!freq) return;
 
     // ─── 鼓槌噪声瞬态 (hammer strike, 50ms) ───────────────────────
-    const noiseBufferSize = Math.floor(ctx.sampleRate * 0.05);
+    const noiseBufferSize = Math.floor(ctx.sampleRate * CONSTS.HAMMER_NOISE_DURATION);
     const noiseBuffer = ctx.createBuffer(1, noiseBufferSize, ctx.sampleRate);
     const noiseData = noiseBuffer.getChannelData(0);
     for (let i = 0; i < noiseBufferSize; i++) {
@@ -253,12 +285,12 @@ export class Audio {
     noiseFilter.type = 'highpass';
     noiseFilter.frequency.value = 1500;
     const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.15;
+    noiseGain.gain.value = CONSTS.HAMMER_NOISE_PEAK;
     noiseSrc.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
     noiseGain.connect(this._masterGain);
     noiseSrc.start(t);
-    noiseSrc.stop(t + 0.05);
+    noiseSrc.stop(t + CONSTS.HAMMER_NOISE_DURATION);
     this._trackSource(noiseSrc);
 
     // ─── 基音 + 4 泛音 ─────────────────────────────────────────────
@@ -286,19 +318,19 @@ export class Audio {
     // ADSR 包络
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.0001, t);
-    env.gain.exponentialRampToValueAtTime(0.65, t + 0.01);    // attack
-    env.gain.exponentialRampToValueAtTime(0.35, t + 0.15);    // decay
-    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);    // release
+    env.gain.exponentialRampToValueAtTime(CONSTS.PLAYNOTE_ATTACK, t + CONSTS.ADSR_ATTACK);    // attack
+    env.gain.exponentialRampToValueAtTime(CONSTS.PLAYNOTE_DECAY, t + CONSTS.ADSR_DECAY);    // decay
+    env.gain.exponentialRampToValueAtTime(0.0001, t + CONSTS.PLAYNOTE_RELEASE);    // release
 
     // 泛音量
     const g2 = ctx.createGain();
-    g2.gain.value = 0.15;
+    g2.gain.value = CONSTS.PLAYNOTE_HARMONIC_2;
     const g3 = ctx.createGain();
-    g3.gain.value = 0.05;
+    g3.gain.value = CONSTS.PLAYNOTE_HARMONIC_3;
     const g4 = ctx.createGain();
-    g4.gain.value = 0.03;   // 4 次泛音更弱
+    g4.gain.value = CONSTS.PLAYNOTE_HARMONIC_4;   // 4 次泛音更弱
     const g5 = ctx.createGain();
-    g5.gain.value = 0.015;  // 5 次泛音更更弱
+    g5.gain.value = CONSTS.PLAYNOTE_HARMONIC_5;  // 5 次泛音更更弱
 
     osc1.connect(env);
     osc2.connect(g2); g2.connect(env);
@@ -309,11 +341,11 @@ export class Audio {
 
     // 20% 信号送混响总线
     const sendGain = ctx.createGain();
-    sendGain.gain.value = 0.2;
+    sendGain.gain.value = CONSTS.REVERB_SEND;
     env.connect(sendGain);
     sendGain.connect(this._reverbBus);
 
-    const stopT = t + 0.85;
+    const stopT = t + CONSTS.ADSR_RELEASE;
     osc1.start(t); osc1.stop(stopT);
     osc2.start(t); osc2.stop(stopT);
     osc3.start(t); osc3.stop(stopT);
@@ -340,7 +372,7 @@ export class Audio {
    */
   correct() {
     if (!this.unlocked || this.muted) return;
-    this._sfxArpeggio([523.25, 659.25, 783.99, 1046.5], 0.18, 0.06, 'sine', 0.55);
+    this._sfxArpeggio([523.25, 659.25, 783.99, 1046.5], 0.18, 0.06, 'sine', CONSTS.CORRECT_PEAK);
   }
 
   /**
@@ -348,7 +380,7 @@ export class Audio {
    */
   wrong() {
     if (!this.unlocked || this.muted) return;
-    this._sfxSlide(320, 150, 0.35, 'triangle', 0.45);
+    this._sfxSlide(320, 150, 0.35, 'triangle', CONSTS.WRONG_PEAK);
   }
 
   /**
@@ -361,7 +393,7 @@ export class Audio {
       setTimeout(() => this._playNoteWebAudio(pitch), i * 220);
     });
     // 末尾闪铃
-    setTimeout(() => this._sfxArpeggio([1046.5, 1567.98, 2093], 0.12, 0.08, 'sine', 0.5),
+    setTimeout(() => this._sfxArpeggio([1046.5, 1567.98, 2093], 0.12, 0.08, 'sine', CONSTS.ARPEGGIO_DEFAULT_PEAK),
       pitches.length * 220 + 200);
   }
 
@@ -372,7 +404,10 @@ export class Audio {
     this.muted = !this.muted;
     if (this._masterGain) {
       this._masterGain.gain.cancelScheduledValues(this._webAudio.currentTime);
-      this._masterGain.gain.linearRampToValueAtTime(this.muted ? 0 : 0.75, 0.05);
+      this._masterGain.gain.linearRampToValueAtTime(
+        this.muted ? CONSTS.MASTER_GAIN_MUTED : CONSTS.MASTER_GAIN_NORMAL,
+        0.05
+      );
     }
     // v18: 静音时立即停掉所有正在响的 osc, 避免长 envelope 余音
     if (this.muted) {
@@ -427,7 +462,7 @@ export class Audio {
     osc.frequency.exponentialRampToValueAtTime(180, t + 0.12);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.35, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(CONSTS.HOVER_PEAK, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
     osc.connect(g).connect(this._masterGain);
     osc.start(t);
@@ -435,7 +470,7 @@ export class Audio {
     this._trackOsc(osc, t + 0.18);
   }
 
-  _sfxArpeggio(freqs, duration = 0.18, gap = 0.06, type = 'sine', peak = 0.5) {
+  _sfxArpeggio(freqs, duration = 0.18, gap = 0.06, type = 'sine', peak = CONSTS.ARPEGGIO_DEFAULT_PEAK) {
     if (!this._webAudio) return;
     this._resumeWebAudio();
     const ctx = this._webAudio;
@@ -456,7 +491,7 @@ export class Audio {
     });
   }
 
-  _sfxSlide(from = 320, to = 150, duration = 0.35, type = 'triangle', peak = 0.45) {
+  _sfxSlide(from = 320, to = 150, duration = 0.35, type = 'triangle', peak = CONSTS.WRONG_PEAK) {
     if (!this._webAudio) return;
     this._resumeWebAudio();
     const ctx = this._webAudio;
