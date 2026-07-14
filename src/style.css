@@ -667,14 +667,18 @@ body::before {
   .overlay__title { font-size: 22px; }
 }
 
-@media (max-width: 900px) and (orientation: landscape) {
-  /* iPhone 横屏: 高度只有 ~320px, 用更紧凑的布局 */
-  .hud { height: 36px; padding: 4px 8px; }
-  .stage { top: 36px; bottom: 48px; }
-  .staff-wrap.stage__staff-area { height: 50%; }
-  .keyboard-area.stage__kb-area { height: 45%; }
-  .fish-pool { bottom: 45%; height: 18%; }
-  .bubble { height: 44px; padding: 4px 10px; }
+@media (max-width: 920px) and (orientation: landscape) {
+  /* iPhone / 小平板 横屏 (iPhone 16 Pro landscape: 874×402)
+     iPhone 16 Pro: 874 wide × 402 tall, 视高 320px (减 HUD/bubble)
+     给 staff 多空间 (60%), keyboard 缩小 (30%) */
+  .hud { height: 40px; padding: 4px 10px; }
+  .stage { top: 40px; bottom: 52px; }
+  .staff-wrap.stage__staff-area { height: 58%; }
+  .keyboard-area.stage__kb-area { height: 32%; }
+  .fish-pool { bottom: 32%; height: 18%; }
+  .bubble { height: 50px; padding: 4px 12px; }
+  .hud__btn { width: 34px; height: 34px; font-size: 16px; }
+  .hud__stars { font-size: 18px; }
 }
 
 input, textarea, select { font-size: 16px; }
@@ -719,11 +723,13 @@ input, textarea, select { font-size: 16px; }
 @media (orientation: portrait) {
   .rotate-hint { display: flex; }
   .hud, .stage, .bubble { visibility: hidden; }
+  /* 鱼也藏一下, 避免透出来 */
+  .fish-pool { visibility: hidden; }
 }
-/* iPad 大屏无视方向限制 */
-@media (min-width: 900px) and (min-height: 700px) {
+/* iPad 大屏无视方向限制 (1024×768 以上) */
+@media (min-width: 1024px) and (min-height: 700px) {
   .rotate-hint { display: none !important; }
-  .hud, .stage, .bubble { visibility: visible !important; }
+  .hud, .stage, .bubble, .fish-pool { visibility: visible !important; }
 }
 
 /* 全局禁用 iOS 双指缩放 / 文本缩放 / 长按菜单 */
