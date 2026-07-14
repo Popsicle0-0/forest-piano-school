@@ -22,7 +22,7 @@
 | **主分支** | `main` (源代码) |
 | **GitHub Pages URL** | https://popsicle0-0.github.io/forest-piano-school/ |
 | **Pages 设置** | 仓库 Settings → Pages → Source: gh-pages branch / root |
-| **GitHub Token** | 用户手里有(7 天期限,部署完建议 revoke) |
+| **GitHub Token** | 在 `docs/CREDENTIALS.md` (gitignored, 不进 git), 30 天期限 |
 
 **用户首次部署时已做**:
 1. 浏览器创建仓库 `forest-piano-school` (Public)
@@ -33,7 +33,7 @@
 
 ## 2. 当前线上版本
 
-最新部署: **v14.1** (iPad 键盘比例修复)
+最新部署: **v15** (iPhone PWA 声音修复)
 
 | 版本 | 内容 |
 |---|---|
@@ -44,7 +44,8 @@
 | v12 | JS 直接 inline 强制布局 (iOS PWA vh/percent 失效) |
 | v13 | 键盘 38% + PolySynth + 按钮 click handler + iPad 阈值 700 |
 | v14 | 纯原生 Web Audio API + 禁缩放 JS + phone 检测 min(w,h)≤500 |
-| **v14.1** | iPad 键盘比例 0.55/0.45 (原 0.7/1.3 太大) |
+| v14.1 | iPad 键盘比例 0.55/0.45 (原 0.7/1.3 太大) |
+| **v15** | **iPhone PWA 声音修复** (子代理): 同步 `unlockOnGesture` + 静音 oscillator + 静音 HTMLAudio 暖通 + Web Audio 时间轴调度 + pointerdown+click 双重绑定 + `_ensureUnlocked` 兜底 |
 
 **版本号显示**: 左上角星星 ⭐⭐⭐ 旁边有个灰底 `vXX` 标签,用户可以一眼看出当前版本。
 
@@ -198,20 +199,29 @@ const isPhone = Math.min(window.innerWidth, window.innerHeight) <= 500;
 
 ## 7. 当前已知问题 & 待办
 
-### 7.1 🔴 **声音在 iPhone Safari PWA 不工作(优先!)**
-- **状态**: 子代理在跑(在我交接前正在修)
-- **症状**: v14 部署后,桌面 Chrome 正常,iPhone PWA 完全无声
-- **已尝试**: v14 改用纯原生 Web Audio API(三角波+正弦泛音+ADSR),`unlockOnGesture` 里 `new AudioContext` + `resume()` + setTimeout 100ms 播测试音 C5
-- **iOS PWA 失败可能原因**:
-  1. `pointerdown` 在 iOS PWA 不是有效 user gesture
-  2. `async` 函数的 `await` 丢失了 gesture context
-  3. AudioContext 在 PWA 模式下被额外限制
-  4. 需要 silent HTMLAudioElement 先 play 解锁音频通道
-- **下一步**:
-  - 改用 `click` 而非 `pointerdown`
-  - 加 silent `<audio>` play 解锁
-  - 在 document 级别 touchend 触发
-  - 检查 AudioContext 实际状态,日志输出
+### 7.1 🟢 声音 — v15 已部署, 待用户真机测试
+- **状态**: v15 已部署 gh-pages,等用户在 iPhone PWA 上验证
+- **v14 失败原因**:
+  1. `unlockOnGesture` 是 `async`,`await` 丢失 gesture context
+  2. `setTimeout(100ms)` 测试音不算"在用户手势内启动",iOS 拒绝播放
+  3. AudioContext 在 PWA 模式没真的"激活"
+- **v15 修复** (`src/systems/Audio.js` + `src/systems/Game.js`):
+  1. `unlockOnGesture()` 改为**同步函数** (无 async/await)
+  2. 同步播一个**静音 oscillator** (gain=0, 1ms 极短) — iOS 音频会话解锁核心 trick
+  3. 同步 play 一个**静音 HTMLAudioElement** — PWA standalone 音频路由暖通
+  4. 测试音调度到 **Web Audio 时间轴** (`osc.start(ctx.currentTime + 0.08)`) — 不算 setTimeout
+  5. 同时绑 `pointerdown` + `click` 双重保险
+  6. `_ensureUnlocked()` 兜底 — 后续手势给 iOS 第二次机会
+- **待用户验证**: 真机 iPhone PWA 听到测试音 + 钢琴音
+
+### 7.2 🟡 钢琴键 `data-color` CSS var 在 confetti 不解析
+- **已修**: NOTES 用 hex 色值,`this.burst()` 传 hex 不用 `var(--fish-red)`
+
+### 7.3 🟡 拖动时 svg `pointer-events: none` 把所有 SVG 点击废了
+- **已修**: 改为只对 `img` 禁用,SVG 不动
+
+### 7.4 🟡 Fish.js SVG width/height attribute 撑爆布局
+- **已修**: 删 attribute,加 CSS `width:100% height:100%`
 
 ### 7.2 🟡 钢琴键 `data-color` CSS var 在 confetti 不解析
 - **已修**: NOTES 用 hex 色值,`this.burst()` 传 hex 不用 `var(--fish-red)`
@@ -417,9 +427,12 @@ kb.glowAll();        // 全部白键依次闪烁
 
 ---
 
-**最后更新**: 2026-07-14 v14.1, iPad 修复完成,声音子代理运行中
+**最后更新**: 2026-07-14 **v15** 已部署 (iPhone PWA 声音修复), 待用户真机测试声音
 
 **TODO 优先级**:
-1. 🔴 等声音子代理完成 → 部署 v15 → 验证 iPhone PWA 有声
-2. 🟡 继续后续关卡开发
+1. 🔴 用户真机测试 iPhone PWA 声音 → 成功就继续第 2 关;还失败就继续调试
+2. 🟡 继续后续关卡开发 (第 2 关: 听音找鱼)
 3. 🟢 优化引导/重玩/进度地图
+4. 🟢 真机测试 iPad 键盘比例是否合适
+
+**⚠️ GitHub Push Protection 提示**: 之前尝试把 token 直接写进 HANDOFF.md 时被 GitHub 拦截(`GH013: Push cannot contain secrets`)。**token 不能 commit 进任何 push 的分支**(包括历史)。当前解决方案: token 在 `docs/CREDENTIALS.md` (gitignored),HANDOFF.md 只引用文件位置。
