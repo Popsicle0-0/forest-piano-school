@@ -18,7 +18,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.6';
+const APP_VERSION = 'v18.7';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -180,6 +180,23 @@ function boot() {
     });
   }
 
+  // ====== v18.5: 📊 排行榜 / 成就总览按钮 (HUD 右上角, 动态插入) ======
+  if (hudRight && !document.getElementById('btn-leaderboard')) {
+    const btnLeaderboard = document.createElement('button');
+    btnLeaderboard.className = 'hud__btn';
+    btnLeaderboard.id = 'btn-leaderboard';
+    btnLeaderboard.setAttribute('aria-label', '排行榜');
+    btnLeaderboard.setAttribute('title', '我的成就');
+    btnLeaderboard.textContent = '📊';
+    hudRight.appendChild(btnLeaderboard);
+    btnLeaderboard.addEventListener('click', () => {
+      import('./components/Leaderboard.js').then(({ Leaderboard }) => {
+        const lb = new Leaderboard(document.body, game.progress, game.achievements);
+        lb.show();
+      }).catch((err) => console.warn('[leaderboard] 加载失败:', err));
+    });
+  }
+
   // ====== v18.6: 🎹 自由演奏按钮 (HUD 右上角, 沙盒模式, 无评分) ======
   if (hudRight && !document.getElementById('btn-practice')) {
     const btnPractice = document.createElement('button');
@@ -195,6 +212,24 @@ function boot() {
         const room = new PracticeRoom(document.body, game);
         room.show();
       }).catch((err) => console.warn('[practice] 加载失败:', err));
+    });
+  }
+
+  // ====== 🎵 歌曲库按钮 (HUD 右上角, 动态插入) ======
+  if (hudRight && !document.getElementById('btn-songs')) {
+    const btnSongs = document.createElement('button');
+    btnSongs.className = 'hud__btn';
+    btnSongs.id = 'btn-songs';
+    btnSongs.setAttribute('aria-label', '歌曲库');
+    btnSongs.title = '歌曲库';
+    btnSongs.textContent = '🎵';
+    hudRight.appendChild(btnSongs);
+
+    btnSongs.addEventListener('click', () => {
+      import('./components/SongLibrary.js').then(({ SongLibrary }) => {
+        const lib = new SongLibrary(document.body, game);
+        lib.show();
+      }).catch((err) => console.warn('[songs] 加载失败:', err));
     });
   }
 
