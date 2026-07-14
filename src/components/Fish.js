@@ -42,8 +42,8 @@ export class Fish {
     const blinkOffset = (Math.random() * 2).toFixed(2);
 
     this.el.innerHTML = `
-      <svg xmlns="${SVG_NS}" viewBox="0 0 96 72" width="96" height="72"
-           style="display: block; overflow: visible;">
+      <svg xmlns="${SVG_NS}" viewBox="0 0 96 72"
+           style="display: block; width: 100%; height: 100%; overflow: visible;">
         <g class="fish-body" transform="rotate(${rot} 48 36)">
           <!-- 尾巴(在身体后面) -->
           <path d="M3 36 L20 18 L23 28 L23 44 L20 54 Z"
