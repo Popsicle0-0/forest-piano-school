@@ -2,23 +2,34 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+
+  <!-- iOS / iPadOS 全屏体验: viewport 锁死, 不允许缩放 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+
+  <!-- 添加到主屏幕后启用全屏 (无 Safari UI) -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="森林钢琴" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- 主题色 (状态栏背景) -->
   <meta name="theme-color" content="#FFF8EC" />
+  <meta name="msapplication-TileColor" content="#FFF8EC" />
+
   <title>森林钢琴学校 🎹</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;700;900&family=ZCOOL+KuaiLe&display=swap"
     rel="stylesheet"
-  />
-  <script type="module" crossorigin src="./assets/index-CupzQzuh.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DgffrMhm.css">
+  />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎹%3C/text%3E%3C/svg%3E" />
+  <script type="module" crossorigin src="./assets/index-CmcmXD4C.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DSezlfSN.css">
 </head>
 <body>
   <div id="app">
-    <!-- 关卡 1 容器:由 main.js 动态挂载场景 -->
+    <!-- 顶部 HUD -->
     <header class="hud">
       <div class="hud__stars" id="hud-stars">
         <span class="star" data-i="1">☆</span>
@@ -27,20 +38,26 @@
       </div>
       <div class="hud__right">
         <button class="hud__btn" id="btn-sound" aria-label="声音">🔊</button>
-        <button class="hud__btn" id="btn-help" aria-label="帮助">❓</button>
         <button class="hud__btn" id="btn-home" aria-label="首页">⌂</button>
       </div>
     </header>
 
     <main class="stage" id="stage">
-      <!-- 由 Game 动态填充: Background / Staff / PianoKeyboard / Fish 池 / Pip -->
+      <!-- 由 Game 动态填充 -->
     </main>
 
     <footer class="bubble" id="bubble">
       <div class="bubble__avatar">🐤</div>
-      <div class="bubble__text" id="bubble-text">Pip 说:点我开始～</div>
+      <div class="bubble__text" id="bubble-text">Pip 说:点屏幕开始呀～</div>
     </footer>
+
+    <!-- 竖屏提示遮罩: iPhone 必须横屏才能玩 -->
+    <div class="rotate-hint" id="rotate-hint">
+      <div class="rotate-hint__icon">📱↻</div>
+      <div class="rotate-hint__text">请把手机横过来</div>
+      <div class="rotate-hint__sub">横屏游戏效果最好</div>
+    </div>
   </div>
-
+
 </body>
 </html>

@@ -29,55 +29,27 @@ export class Audio {
   }
 
   /**
-   * 等用户首次手势后调用:
+   * 等用户首次手势后调用 (立即返回, 不阻塞 UI):
    *  - 同步 resume AudioContext (满足 iOS 策略)
-   *  - 加载钢琴采样
-   *  - 初始化 SFX 合成器
+   *  - 立刻用合成器 fallback, 让 playNote 立即可用
+   *  - 在后台慢慢加载 Salamander 钢琴采样, 加载完自动切换到真钢琴
    */
   async unlockOnGesture() {
     if (this.unlocked) return;
 
-    // 1) Tone.js 主上下文
-    await Tone.start();
+    // 1) Tone.js 主上下文 (必须在用户手势里同步触发)
+    try { await Tone.start(); } catch (e) { console.warn('[Audio] Tone.start 失败:', e); }
 
-    // 2) 主总线 + 备用合成器
+    // 2) 主总线 + 合成器 fallback
     this._bus = new Tone.Gain(0.9).toDestination();
     this._synth = new Tone.Synth({
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.18 },
     }).connect(this._bus);
+    // 立刻把 piano 设为合成器, 这样 playNote 永远可用
+    this.piano = this._synth;
 
-    // 3) 钢琴采样 (Salamander Grand Piano, Tone.js 官方 CDN)
-    //    实际可用采样 (curl 2026-07-14 实测):
-    //      A1.mp3 ~ A6.mp3 (全 6 个, 200)
-    //      C1.mp3 ~ C6.mp3 (全 6 个, 200)
-    //      Ds4.mp3 / Fs4.mp3 (黑键, 200)
-    //    之前只用 A4 + C4 两个采样点, Sampler 做大幅 pitch-shift 会很"塑料".
-    //    现在给 12 个采样点, 听感接近真实钢琴.
-    try {
-      this.piano = new Tone.Sampler({
-        urls: {
-          A1: 'A1.mp3', A2: 'A2.mp3', A3: 'A3.mp3',
-          A4: 'A4.mp3', A5: 'A5.mp3', A6: 'A6.mp3',
-          C1: 'C1.mp3', C2: 'C2.mp3', C3: 'C3.mp3',
-          C4: 'C4.mp3', C5: 'C5.mp3', C6: 'C6.mp3',
-          'D#4': 'Ds4.mp3',
-          'F#4': 'Fs4.mp3',
-        },
-        baseUrl: 'https://tonejs.github.io/audio/salamander/',
-        release: 1.4,            // 更长的 release, 钢琴延音
-        attack: 0.005,
-      }).connect(this._bus);
-
-      // 给采样一个超时容错: 即使某些 mp3 永远 404, 也不阻塞首屏
-      const loadTimeout = new Promise((resolve) => setTimeout(resolve, 8000));
-      await Promise.race([Tone.loaded(), loadTimeout]);
-    } catch (e) {
-      console.warn('[Audio] Salamander 采样加载失败, 降级到合成器:', e);
-      this.piano = this._synth; // 兜底: 钢琴键用三角波
-    }
-
-    // 4) 原生 Web Audio 总线 (用于 SFX 合成)
+    // 3) 原生 Web Audio 总线 (SFX 用)
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (Ctx) {
@@ -91,6 +63,43 @@ export class Audio {
     }
 
     this.unlocked = true;
+
+    // 4) 后台异步加载 Salamander 真钢琴采样 (不等, 不阻塞)
+    this._loadPianoInBackground();
+  }
+
+  /** 后台加载真钢琴采样, 加载完无缝切换 (fire-and-forget) */
+  _loadPianoInBackground() {
+    let sampler;
+    try {
+      sampler = new Tone.Sampler({
+        urls: {
+          A1: 'A1.mp3', A2: 'A2.mp3', A3: 'A3.mp3',
+          A4: 'A4.mp3', A5: 'A5.mp3', A6: 'A6.mp3',
+          C1: 'C1.mp3', C2: 'C2.mp3', C3: 'C3.mp3',
+          C4: 'C4.mp3', C5: 'C5.mp3', C6: 'C6.mp3',
+          'D#4': 'Ds4.mp3',
+          'F#4': 'Fs4.mp3',
+        },
+        baseUrl: 'https://tonejs.github.io/audio/salamander/',
+        release: 1.4,
+        attack: 0.005,
+      }).connect(this._bus);
+
+      // 12s 超时 — 超过了就保持合成器
+      const loadTimeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), 12000));
+      Promise.race([Tone.loaded(), loadTimeout]).then((result) => {
+        if (result === 'timeout') {
+          console.warn('[Audio] 钢琴采样加载超时, 保持合成器音色');
+          return;
+        }
+        // 切换到真钢琴
+        this.piano = sampler;
+        console.log('[Audio] 钢琴采样加载完成, 切换到 Salamander');
+      });
+    } catch (e) {
+      console.warn('[Audio] 钢琴采样初始化失败, 保持合成器:', e);
+    }
   }
 
   /**

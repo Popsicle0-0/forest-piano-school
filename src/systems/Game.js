@@ -97,14 +97,10 @@ export class Game {
       if (started) return;
       started = true;
       if (e) e.preventDefault();
-      // 立即给视觉反馈
-      const btn = overlay.querySelector('#start-btn');
-      if (btn) {
-        btn.textContent = '加载声音中…';
-        btn.disabled = true;
-      }
-      // iOS / Safari: 必须在用户手势里同步触发 Tone.start()
-      try { await this.audio.unlockOnGesture(); } catch (err) { console.warn(err); }
+
+      // 关键: 不 await 音频加载! 立刻进游戏, 钢琴采样在后台慢慢加载
+      // unlockOnGesture 内部用合成器做 fallback, 立刻能出声
+      this.audio.unlockOnGesture().catch((err) => console.warn(err));
       overlay.remove();
       this._beginLevel();
     };
@@ -114,7 +110,6 @@ export class Game {
     btn.addEventListener('pointerdown', onStart);
     // 整张遮罩也可点 (兜底)
     overlay.addEventListener('pointerdown', (e) => {
-      // 如果点的是按钮已经处理了
       if (e.target.closest('#start-btn')) return;
       onStart(e);
     });
