@@ -7,7 +7,7 @@ import { Audio } from './systems/Audio.js';
 import { Progress } from './systems/Progress.js';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -43,13 +43,21 @@ function boot() {
   // ====== 关键: 移动端 JS 强制布局 ======
   // iOS PWA 上 CSS vh/percent 不可靠, 用 JS 直接给元素设 inline style
   applyPhoneLayout();
-  window.addEventListener('resize', applyPhoneLayout);
+  applyTabletLayout();
+  window.addEventListener('resize', () => {
+    applyPhoneLayout();
+    applyTabletLayout();
+  });
   window.addEventListener('orientationchange', () => {
     setTimeout(applyPhoneLayout, 100);
+    setTimeout(applyTabletLayout, 100);
     setTimeout(applyPhoneLayout, 400);
+    setTimeout(applyTabletLayout, 400);
   });
   setTimeout(applyPhoneLayout, 500);
+  setTimeout(applyTabletLayout, 500);
   setTimeout(applyPhoneLayout, 1500);
+  setTimeout(applyTabletLayout, 1500);
 
   // ====== 右上角按钮: 声音 / 重玩 / 主页 ======
   const btnSound = document.getElementById('btn-sound');
@@ -225,4 +233,154 @@ function applyPhoneLayout() {
     bubble.style.padding = '4px 12px';
     bubble.style.margin = '0';
   }
+}
+
+/**
+ * iPad 强制布局 (v17+): 直接给元素设 inline pixel style
+ * 覆盖 iPad mini 7.9" (1024×768) 到 iPad Pro 13" (1366×1024), 横竖屏
+ * 检测: min(w,h) >= 700 && min(w,h) < 1400 && max(w,h) <= 1400
+ * 比例:
+ *   - 横屏: keyboard 38vh / staff 38vh / fish 15vh / hud 5vh / bubble 4vh
+ *   - 竖屏: keyboard 35vh / staff 35vh / fish 18vh / hud 6vh / bubble 6vh
+ * iOS PWA 的 vh 在 iPad 上偶尔算错, 用 innerHeight 换算成 px 更稳
+ */
+function applyTabletLayout() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const minSide = Math.min(w, h);
+  const maxSide = Math.max(w, h);
+  // iPad 检测: 700 <= minSide < 1400 && maxSide <= 1400
+  // iPhone 16 Pro landscape: 874×402 — minSide 402 < 700 → 不是 iPad
+  // iPad mini: 1024×768 — minSide 768 ≥ 700 ✓
+  // iPad Pro 13": 1366×1024 — minSide 1024 ≥ 700 ✓
+  // iPad Pro 11": 1194×834 — minSide 834 ≥ 700 ✓
+  const isTablet = minSide >= 700 && minSide < 1400 && maxSide <= 1400;
+  if (!isTablet) return;
+
+  const isLandscape = w > h;
+
+  // 比例 (vh 百分比, 总和 = 100)
+  let hudPct, bubblePct, kbPct, staffPct, fishPct;
+  if (isLandscape) {
+    hudPct = 0.05; bubblePct = 0.04; kbPct = 0.38; staffPct = 0.38; fishPct = 0.15;
+  } else {
+    hudPct = 0.06; bubblePct = 0.06; kbPct = 0.35; staffPct = 0.35; fishPct = 0.18;
+  }
+
+  const hudH = Math.max(40, Math.floor(h * hudPct));
+  const bubbleH = Math.max(40, Math.floor(h * bubblePct));
+  const kbH = Math.max(140, Math.floor(h * kbPct));
+  const stageH = h - hudH - bubbleH;
+  // staff 占 (stage - keyboard) 上方, fish 浮在中间
+  const staffH = Math.max(120, Math.floor(stageH * (staffPct / (staffPct + fishPct))));
+  const fishH = Math.max(80, stageH - kbH - staffH);
+
+  // HUD
+  const hud = document.querySelector('.hud');
+  if (hud) {
+    hud.style.position = 'absolute';
+    hud.style.top = '0';
+    hud.style.left = '0';
+    hud.style.right = '0';
+    hud.style.height = hudH + 'px';
+    hud.style.minHeight = hudH + 'px';
+    hud.style.zIndex = '20';
+  }
+
+  // 舞台
+  const stage = document.getElementById('stage');
+  if (stage) {
+    stage.style.position = 'absolute';
+    stage.style.top = hudH + 'px';
+    stage.style.bottom = bubbleH + 'px';
+    stage.style.left = '0';
+    stage.style.right = '0';
+    stage.style.height = 'auto';
+    stage.style.display = 'flex';
+    stage.style.flexDirection = 'column';
+    stage.style.overflow = 'hidden';
+  }
+
+  // 钢琴键盘 (iPad 上需要更大可见面积, 比手机 ~38vh 还多一点)
+  const kb = document.querySelector('.keyboard-area');
+  if (kb) {
+    kb.style.position = 'absolute';
+    kb.style.bottom = '0';
+    kb.style.left = '0';
+    kb.style.right = '0';
+    kb.style.height = kbH + 'px';
+    kb.style.minHeight = '140px';
+    kb.style.width = '100%';
+    kb.style.background = 'rgba(255, 209, 102, 0.2)';
+    kb.style.zIndex = '5';
+    kb.style.display = 'flex';
+    kb.style.alignItems = 'flex-end';
+    kb.style.justifyContent = 'center';
+    kb.style.padding = '0';
+    kb.style.margin = '0';
+    const svg = kb.querySelector('svg.keyboard');
+    if (svg) {
+      svg.style.width = '100%';
+      svg.style.height = '100%';
+      svg.style.maxWidth = '100%';
+      svg.style.maxHeight = '100%';
+      svg.style.display = 'block';
+    }
+  }
+
+  // 五线谱 (键盘上方)
+  const staff = document.querySelector('.staff-wrap');
+  if (staff) {
+    staff.style.position = 'absolute';
+    staff.style.top = '0';
+    staff.style.left = '0';
+    staff.style.right = '0';
+    staff.style.height = staffH + 'px';
+    staff.style.minHeight = '120px';
+    staff.style.display = 'flex';
+    staff.style.alignItems = 'center';
+    staff.style.justifyContent = 'center';
+    staff.style.padding = '0 12px';
+    const svg = staff.querySelector('svg.staff');
+    if (svg) {
+      svg.style.width = '100%';
+      svg.style.height = '100%';
+      svg.style.maxWidth = '100%';
+      svg.style.maxHeight = '100%';
+      svg.style.display = 'block';
+    }
+  }
+
+  // 鱼池 (staff 和 keyboard 中间)
+  const fishPool = document.querySelector('.fish-pool');
+  if (fishPool) {
+    fishPool.style.position = 'absolute';
+    fishPool.style.bottom = kbH + 'px';
+    fishPool.style.left = '0';
+    fishPool.style.right = '0';
+    fishPool.style.height = fishH + 'px';
+    fishPool.style.top = 'auto';
+    fishPool.style.pointerEvents = 'none';
+  }
+
+  // 底部气泡
+  const bubble = document.querySelector('.bubble');
+  if (bubble) {
+    bubble.style.position = 'absolute';
+    bubble.style.bottom = '0';
+    bubble.style.left = '0';
+    bubble.style.right = '0';
+    bubble.style.height = bubbleH + 'px';
+    bubble.style.minHeight = bubbleH + 'px';
+    bubble.style.padding = '8px 16px';
+    bubble.style.margin = '0';
+    const text = bubble.querySelector('.bubble__text');
+    if (text) text.style.fontSize = '16px';
+    const av = bubble.querySelector('.bubble__avatar');
+    if (av) av.style.fontSize = '32px';
+  }
+
+  // 隐藏小提示鸟 (iPad 有足够空间, 不需要鸟吉祥物占位)
+  const pip = document.querySelector('.pip');
+  if (pip) pip.style.display = 'none';
 }

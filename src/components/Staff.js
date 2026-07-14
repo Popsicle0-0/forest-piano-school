@@ -20,14 +20,17 @@ const LEDGER_Y = STAFF_BOTTOM + LINE_GAP;        // 180, Do 第 1 加线
 const SPACE_BELOW_Y = (STAFF_BOTTOM + LEDGER_Y) / 2; // 170, Re 下加一间
 
 // 7 个白键在五线谱上的 y 位置
+// 高音谱号 E4 在最底下一条线 (line 1 from bottom = y=160),
+// 往上依次是 F4 (间), G4 (线 2), A4 (间), B4 (线 3 = middle)。
+// Do/Re 在五线谱下方加线/间。
 const POSITIONS = {
-  mi:  STAFF_TOP,                  // 80  第 1 线
-  fa:  STAFF_TOP + LINE_GAP / 2,   // 90  第 1 间
-  sol: STAFF_TOP + LINE_GAP,       // 100 第 2 线
-  la:  STAFF_TOP + LINE_GAP * 1.5, // 110 第 2 间
-  si:  STAFF_TOP + LINE_GAP * 2,   // 120 第 3 线
-  re:  SPACE_BELOW_Y,              // 170 下加一间
-  do:  LEDGER_Y,                   // 180 第 1 加线
+  mi:  STAFF_BOTTOM,                  // 160 第 1 线 (E4) — bottom
+  fa:  STAFF_BOTTOM - LINE_GAP / 2,   // 150 第 1 间 (F4)
+  sol: STAFF_BOTTOM - LINE_GAP,       // 140 第 2 线 (G4)
+  la:  STAFF_BOTTOM - LINE_GAP * 1.5, // 130 第 2 间 (A4)
+  si:  STAFF_BOTTOM - LINE_GAP * 2,   // 120 第 3 线 (B4) — middle
+  re:  SPACE_BELOW_Y,                 // 170 下加一间 (D4)
+  do:  LEDGER_Y,                      // 180 下加一线 (C4)
 };
 
 export class Staff {
@@ -68,10 +71,10 @@ export class Staff {
             <text class="staff__label staff__label--top" x="${x}" y="${y - 22}" text-anchor="middle" visibility="hidden">
               <tspan class="pitch">${n.note}</tspan>
             </text>
-            <circle class="staff__dot empty" cx="${x}" cy="${y}" r="11" />
+            <circle class="staff__dot empty" cx="${x}" cy="${y}" r="14" />
             <text class="staff__label staff__label--bot" x="${x}" y="${y + 28}" text-anchor="middle" visibility="hidden">${n.solfege}</text>
             <!-- 透明大热区,扩大拖放容差 -->
-            <circle class="staff__hit" cx="${x}" cy="${y}" r="40" fill="transparent" />
+            <circle class="staff__hit" cx="${x}" cy="${y}" r="44" fill="transparent" />
           </g>
         `;
       })
@@ -81,7 +84,7 @@ export class Staff {
       <svg class="staff" xmlns="${SVG_NS}" viewBox="0 0 ${W} ${H}"
            preserveAspectRatio="xMidYMid meet" aria-label="五线谱">
         <!-- 高音谱号 -->
-        <text class="staff__clef" x="40" y="${STAFF_BOTTOM - 4}">𝄞</text>
+        <text class="staff__clef" x="40" y="140" dominant-baseline="middle">𝄞</text>
 
         <!-- 5 条主线 -->
         ${lines}
@@ -116,7 +119,7 @@ export class Staff {
     const dot = slot.querySelector('.staff__dot');
     if (!dot) return;
     dot.classList.remove('empty');
-    dot.setAttribute('r', '13');
+    dot.setAttribute('r', '17');
     // 鱼的颜色可能是 var(--fish-red) 形式,直接在 SVG 元素的 fill 上设,浏览器会解析
     dot.style.fill = note.color;
     // 归位成功后,标签永久显示
@@ -151,7 +154,7 @@ export class Staff {
       const dot = s.querySelector('.staff__dot');
       if (dot) {
         dot.classList.add('empty');
-        dot.setAttribute('r', '11');
+        dot.setAttribute('r', '14');
         dot.style.fill = '';
       }
       s.querySelectorAll('.staff__label').forEach((l) => (l.style.visibility = 'hidden'));

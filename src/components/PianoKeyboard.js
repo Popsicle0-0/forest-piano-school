@@ -184,6 +184,39 @@ export class PianoKeyboard {
       setTimeout(() => this.glowKey(key), i * 200);
     });
   }
+
+  /**
+   * 在已放置的白键上贴一个彩色小圆点 (颜色 = 鱼的颜色)
+   * 永久显示, 直到 resetMarks() 调用
+   * @param {string} id 'do'|'re'|...
+   * @param {string} color '#e63946' hex
+   */
+  markPlaced(id, color) {
+    if (!this.svg) return;
+    const key = this.svg.querySelector(`.key--white[data-id="${id}"]`);
+    if (!key) return;
+    // 已经标记过就不重复
+    if (key.querySelector('.kb-placed-dot')) return;
+    // 计算 key 顶部 (避免被黑键盖住 — 黑键在 z-index: 2)
+    const bbox = key.getBBox ? key.getBBox() : { x: 0, y: 0, width: 80, height: 220 };
+    const cx = bbox.x + bbox.width / 2;
+    const cy = bbox.y + 18; // 18px from top of key
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('class', 'kb-placed-dot');
+    dot.setAttribute('cx', cx);
+    dot.setAttribute('cy', cy);
+    dot.setAttribute('r', '10');
+    dot.setAttribute('fill', color);
+    dot.setAttribute('stroke', 'white');
+    dot.setAttribute('stroke-width', '2');
+    key.appendChild(dot);
+  }
+
+  /** 清空所有 key 上的标记 */
+  resetMarks() {
+    if (!this.svg) return;
+    this.svg.querySelectorAll('.kb-placed-dot').forEach((el) => el.remove());
+  }
 }
 
 export default PianoKeyboard;

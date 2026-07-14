@@ -30,29 +30,59 @@ export class Audio {
    */
   async unlockOnGesture() {
     if (this.unlocked) return;
+    console.log('[Audio] unlockOnGesture entered');
 
-    // 1) 原生 Web Audio (主路径)
+    // 路径 1+3: 原生 Web Audio — 必须在用户手势里同步 resume + 立刻调度节点
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (Ctx) {
+      if (!this._webAudio && Ctx) {
         this._webAudio = new Ctx();
         this._masterGain = this._webAudio.createGain();
         this._masterGain.gain.value = 0.5;
         this._masterGain.connect(this._webAudio.destination);
-        // 立即 resume
+      }
+      if (this._webAudio) {
+        // 立即 resume (await 仍保持 gesture context, iOS 文档保证)
         if (this._webAudio.state === 'suspended') {
-          await this._webAudio.resume();
+          try { await this._webAudio.resume(); } catch (e) {
+            console.warn('[Audio] resume() 失败:', e);
+          }
+        }
+        console.log('[Audio] AudioContext state:', this._webAudio.state);
+
+        // 同步静音 oscillator — iOS PWA 音频会话解锁核心 trick
+        // gain=0 无声, 但会触发 iOS media session 真正激活
+        try {
+          const osc = this._webAudio.createOscillator();
+          osc.frequency.value = 440;
+          const gain = this._webAudio.createGain();
+          gain.gain.value = 0;
+          osc.connect(gain).connect(this._masterGain);
+          osc.start();
+          osc.stop(this._webAudio.currentTime + 0.01);
+        } catch (e) {
+          console.warn('[Audio] 静音 oscillator 启动失败:', e);
+        }
+
+        // 路径 3: 测试音调度到 Web Audio 时间轴 (ctx.currentTime + 0.05)
+        // 不再用 setTimeout, iOS 拒绝 off-gesture 排程
+        try {
+          this._testBeep();
+          console.log('[Audio] test beep scheduled at t+0.05');
+        } catch (e) {
+          console.warn('[Audio] test beep 调度失败:', e);
         }
       }
     } catch (e) {
       console.warn('[Audio] Web Audio 初始化失败:', e);
     }
 
-    this.unlocked = true;
-    // 测试音: 让用户立刻知道声音工作了
-    setTimeout(() => this._testBeep(), 100);
+    // 路径 2: 静音 HTMLAudioElement 暖通 PWA 音频路由
+    this._warmUpHtmlAudio();
 
-    // 2) 后台加载 Salamander 真钢琴 (fire-and-forget, 用 Tone.js)
+    this.unlocked = true;
+
+    // 后台加载 Salamander 真钢琴 (fire-and-forget, 用 Tone.js)
     this._loadPianoInBackground();
   }
 
@@ -62,12 +92,21 @@ export class Audio {
     }
   }
 
-  /** 测试音: C5 sine 0.2s, 让用户知道声音 OK */
+  /** 暖通 iOS media session: silent HTMLAudioElement play (PWA standalone 模式特别需要) */
+  _warmUpHtmlAudio() {
+    try {
+      const a = new Audio();
+      a.src = 'data:audio/mp3;base64,//uQx'; // 极短静音 mp3 (约 0.01s)
+      a.play().catch(() => {});
+    } catch (_) {}
+  }
+
+  /** 测试音: C5 sine 0.2s, 让用户知道声音 OK (调度到 t+0.05, 用 Web Audio 时间轴) */
   _testBeep() {
     if (!this._webAudio) return;
     this._resumeWebAudio();
     const ctx = this._webAudio;
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + 0.05;  // 调度 50ms 后, 避开 iOS gesture→audio 0ms 边界
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';

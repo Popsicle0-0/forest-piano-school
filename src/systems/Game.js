@@ -134,9 +134,15 @@ export class Game {
       started = true;
       if (e) e.preventDefault();
 
-      // 关键: 不 await 音频加载! 立刻进游戏, 钢琴采样在后台慢慢加载
-      // unlockOnGesture 内部用合成器做 fallback, 立刻能出声
+      // iOS PWA 音频解锁三连击 (全在 gesture handler 同步触发):
+      // 1) sync resume kick-off
+      // 2) HTMLAudio 暖通 iOS media session
+      // 3) unlockOnGesture 内部做静音 oscillator + 测试音 (async 是 OK 的, 已 unlocked)
+      try { this.audio._resumeWebAudio(); } catch (_) {}
+      try { this.audio._warmUpHtmlAudio(); } catch (_) {}
       this.audio.unlockOnGesture().catch((err) => console.warn(err));
+
+      // 关键: 不 await 音频加载! 立刻进游戏, 钢琴采样在后台慢慢加载
       overlay.remove();
       this._beginLevel();
     };
@@ -352,6 +358,28 @@ export class Game {
         const colorHex = (NOTES.find((n) => n.id === id) || {}).color || '#ffc971';
         this.burst(rect.left + rect.width / 2, rect.top + rect.height / 2, colorHex);
 
+        // 标记对应琴键 (永久)
+        try { this.kb.markPlaced(id, colorHex); } catch (_) {}
+
+        // 夸张反馈: 全屏白闪 + 飘字 +1 + 鱼摇摆庆祝
+        this._flashScreen();
+        const noteObj = NOTES.find((n) => n.id === id);
+        if (noteObj) {
+          this._floatScore(rect.left + rect.width / 2, rect.top, `${noteObj.solfege} +1`);
+          try { this.audio.playNote(noteObj.pitch); } catch (_) {} // 再弹一次该音
+        }
+
+        // 鱼摇摆庆祝 0.6s
+        gsap.to(fish, {
+          rotation: '+=8',
+          transformOrigin: '50% 50%',
+          duration: 0.12,
+          yoyo: true,
+          repeat: 5,
+          ease: 'sine.inOut',
+          onComplete: () => gsap.to(fish, { rotation: 0, duration: 0.2, ease: 'power2.out' })
+        });
+
         // 6) 鱼原地弹一下
         gsap.fromTo(fish, { scale: 0.85 }, { scale: 1.05, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out' });
 
@@ -520,6 +548,7 @@ export class Game {
     this._idleNudgeScheduled = false;
 
     // 视觉重置
+    if (this.kb) this.kb.resetMarks();
     if (this.staff) this.staff.reset();
     if (this.fishPool) this.fishPool.reset();
 
@@ -544,6 +573,26 @@ export class Game {
       shapes: ['circle'],
       scalar: 0.7,
     });
+  }
+
+  _flashScreen() {
+    const flash = document.createElement('div');
+    flash.className = 'screen-flash';
+    document.body.appendChild(flash);
+    setTimeout(() => {
+      flash.style.opacity = '0';
+      setTimeout(() => flash.remove(), 300);
+    }, 50);
+  }
+
+  _floatScore(x, y, text) {
+    const el = document.createElement('div');
+    el.className = 'score-float';
+    el.textContent = text;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1400);
   }
 
   say(text) {
