@@ -18,7 +18,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.7';
+const APP_VERSION = 'v18.8';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -78,6 +78,22 @@ function boot() {
       }, 5500);
     }, 3000);
   }
+
+  // ====== v18.8: 关卡徽章 (动态插入 .hud__left 第一位, 点击回 LevelMap) ======
+  const levelBadge = document.createElement('span');
+  levelBadge.className = 'level-badge';
+  levelBadge.id = 'level-badge';
+  levelBadge.title = '点击返回关卡地图';
+  levelBadge.setAttribute('role', 'button');
+  levelBadge.setAttribute('aria-label', '当前关卡 - 点击返回地图');
+  levelBadge.textContent = '🐟 第 1 关 · 小鱼跳进五线谱';
+  const hudLeftForBadge = document.querySelector('.hud__left');
+  if (hudLeftForBadge) hudLeftForBadge.insertBefore(levelBadge, hudLeftForBadge.firstChild);
+  // 点击徽章 → 回关卡地图 (解决"不知道怎么玩别的关卡")
+  levelBadge.addEventListener('click', () => {
+    document.querySelectorAll('.overlay, .level-map-overlay, .practice-room, .song-library, .song-demo-overlay, .song-play-overlay, .song-score-overlay, .achievements-wall, .settings-panel, .tutorial, .keyboard-help, .streak-toast').forEach((el) => el.remove());
+    game._showStartOverlay();
+  });
 
   // Add 🔥 streak badge to HUD (top)
   const streakBadge = document.createElement('div');

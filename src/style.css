@@ -5070,6 +5070,29 @@ body[data-theme="forest"] .streak-badge {
   color: white;
 }
 
+/* === v18.8: 关卡徽章 (动态插入 .hud__left 第一位, 点击回关卡地图) === */
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, rgba(95, 168, 181, 0.18), rgba(168, 218, 220, 0.22));
+  color: var(--staff-strong);
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 900;
+  border: 2px solid rgba(95, 168, 181, 0.45);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 120ms var(--ease-out-soft, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.level-badge:active { transform: scale(0.94); }
+body[data-theme="night"] .level-badge,
+body[data-theme="forest"] .level-badge {
+  color: white;
+}
+
 /* === v18.3: Splash 启动屏 === */
 .splash {
   position: fixed;

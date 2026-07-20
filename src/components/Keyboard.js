@@ -36,6 +36,13 @@ export class KeyboardShortcuts {
           top.remove();
         }
         e.preventDefault();
+      } else {
+        // v18.8: 无 overlay 时, Esc = 回关卡地图 (新增体验入口)
+        if (this.game && typeof this.game._showStartOverlay === 'function') {
+          this.game._showStartOverlay();
+          e.preventDefault();
+          return;
+        }
       }
     }
 

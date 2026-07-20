@@ -130,3 +130,9 @@ export class LevelMap {
     }
   }
 }
+
+// v18.8: 把 LEVEL_META 挂到 window, 让 Game.start() 不用 import 即可更新 HUD 徽章
+if (typeof window !== 'undefined') {
+  window.__forestPiano = window.__forestPiano || {};
+  window.__forestPiano.LEVEL_META = LEVEL_META;
+}

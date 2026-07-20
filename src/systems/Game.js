@@ -146,8 +146,13 @@ export class Game {
    * 这让新增关卡无需修改 Game.js — 直接添加 src/systems/LevelN.js 文件即可.
    */
   start({ levelId }) {
-    // 关闭所有 overlay
-    document.querySelectorAll('.overlay').forEach((el) => el.remove());
+    // 关闭所有 overlay (含通关遮罩 / 关卡地图 / 自由演奏 / 歌曲库 / 教程 / 设置 / 成就墙 / 快捷键帮助 / streak toast)
+    // v18.8: 修复"两个钢琴"bug — 之前只清 .overlay, PracticeRoom/SongLibrary 残留在 document.body 上浮着
+    document.querySelectorAll(
+      '.overlay, .level-map-overlay, .practice-room, .song-library, ' +
+      '.song-demo-overlay, .song-play-overlay, .song-score-overlay, ' +
+      '.achievements-wall, .settings-panel, .tutorial, .keyboard-help, .streak-toast'
+    ).forEach((el) => el.remove());
     // 清空舞台 (重建场景, 避免叠加上一关的 DOM)
     if (this.stage) this.stage.innerHTML = '';
 
@@ -188,12 +193,31 @@ export class Game {
         console.error(`Level ${levelId} failed to start:`, err);
         this._fallbackToLevel1();
       }
+      // v18.8: 更新 HUD 关卡徽章
+      this._updateLevelBadge(levelId);
       return;
     }
 
     // fallback - 默认第一关
     console.warn(`Level ${levelId} not registered, falling back to Level 1`);
     this._startLevel1();
+    // v18.8: 更新 HUD 关卡徽章 (fallback 也保证徽章同步)
+    this._updateLevelBadge(1);
+  }
+
+  /**
+   * v18.8: 更新 HUD 左上角的关卡徽章文字
+   *  从 window.__forestPiano.LEVEL_META 取元信息 (LevelMap.js 挂上的, 避免循环 import)
+   */
+  _updateLevelBadge(levelId) {
+    try {
+      const lb = document.getElementById('level-badge');
+      if (!lb) return;
+      const meta = window.__forestPiano?.LEVEL_META?.find((m) => m.id === levelId);
+      if (meta) {
+        lb.textContent = `${meta.emoji} 第 ${meta.id} 关 · ${meta.name}`;
+      }
+    } catch (_) { /* localStorage 或 DOM 不在, 静默 */ }
   }
 
   _fallbackToLevel1() {
