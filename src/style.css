@@ -115,13 +115,23 @@ body::before {
   justify-content: space-between;
   padding: 14px 22px;
   z-index: 10;
+  /* v18.9 修复: HUD 按钮从 v18.0 的 4 个长到 v18.8 的 11 个, 小屏放不下会被
+     flex 默认压缩变形导致难以点准. min-width:0 是让子元素 overflow-x 生效的
+     必要条件(flex item 默认 min-width:auto 会撑开父容器阻止滚动)。 */
+  min-width: 0;
 }
 
 .hud__left {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  /* 左侧徽章多了以后也可能溢出, 允许横向滚动而不是把右侧挤走 */
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
 }
+.hud__left::-webkit-scrollbar { display: none; } /* Chrome/Safari 隐藏滚动条但保留滚动能力 */
 
 .hud__version {
   font-family: 'Nunito', monospace;
@@ -134,12 +144,14 @@ body::before {
   letter-spacing: 0.5px;
   user-select: none;
   -webkit-user-select: none;
+  flex-shrink: 0; /* v18.9: 防止 .hud__left 横向滚动时被压扁 */
 }
 
 .hud__dots {
   display: flex;
   gap: 5px;
   align-items: center;
+  flex-shrink: 0; /* v18.9: 防止 .hud__left 横向滚动时被压扁 */
 }
 .hud__dots .dot {
   width: 14px;
@@ -165,7 +177,16 @@ body::before {
 .hud__right {
   display: flex;
   gap: 10px;
+  /* v18.9 修复: 11 个按钮在窄屏(iPhone 横屏)放不下时, 允许横向滚动
+     而不是被 flex 压缩变形到点不准。min-width:0 让 overflow-x 生效。 */
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* 留一点右侧内边距, 滚到底时最后一个按钮不会贴边 */
+  padding-right: 2px;
 }
+.hud__right::-webkit-scrollbar { display: none; }
 
 .hud__btn {
   width: 48px;
@@ -177,6 +198,9 @@ body::before {
   cursor: pointer;
   box-shadow: var(--shadow-paper-1), var(--shadow-paper-2);
   transition: transform 120ms var(--ease-out-soft);
+  /* v18.9 修复: 之前没设 flex-shrink, 按钮多了会被压扁变形导致点击热区变小。
+     现在固定尺寸不许压缩, 放不下时靠 .hud__right 的 overflow-x 滚动解决。 */
+  flex-shrink: 0;
 }
 
 .hud__btn:active {
@@ -1063,10 +1087,14 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
    v17 — iPad 适配 (iPad mini 7.9" 到 iPad Pro 13")
    ============================================ */
 
-/* 主 iPad 区间: 768-1366 宽, ≥700 高
+/* 主 iPad 区间: 768-1400 宽, ≥700 高
    关键: 让 applyTabletLayout() JS 接管 inline style, 这里只重置
-   @media (max-width: 768px) 留下的 vh 值, 避免冲突 */
-@media (min-width: 768px) and (max-width: 1366px) and (min-height: 700px) {
+   @media (max-width: 768px) 留下的 vh 值, 避免冲突
+   v18.9 修复: 原上限 1366px 是按旧款 "iPad Pro 12.9\" (1366×1024)" 设的, 但 2024
+   M4 新一代 "iPad Pro 13\"" 横屏实际是 1376px 宽, 会落在这条规则和 main.js 里
+   applyTabletLayout() 的 JS 判断(maxSide<1400)之间的夹缝——JS 认为该介入,
+   CSS 却没重置 grid, 两边冲突。现在统一改成 1400px 与 JS 对齐。 */
+@media (min-width: 768px) and (max-width: 1400px) and (min-height: 700px) {
   /* 重置 mobile 默认: 让 JS 用 innerHeight 计算的 px 值生效 */
   /* v17.3: 同时提供 baseline min-height, 避免 JS 未运行时元素坍缩 */
   .keyboard-area.stage__kb-area {
@@ -1094,8 +1122,9 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   .hud, .stage, .bubble, .fish-pool { visibility: visible !important; }
 }
 
-/* iPad Pro 12.9" 竖屏: 1024×1366 — 高度很大, 给键盘更多空间 */
-@media (min-width: 1024px) and (max-width: 1366px) and (min-height: 1000px) and (orientation: portrait) {
+/* iPad Pro 12.9"/13" 竖屏: 1024×1366 ~ 1032×1376 — 高度很大, 给键盘更多空间
+   v18.9: 上限同步改为 1400 (对齐 M4 iPad Pro 13" 1032 宽) */
+@media (min-width: 1024px) and (max-width: 1400px) and (min-height: 1000px) and (orientation: portrait) {
   /* 让 JS 接管, 这里什么都不用做 (竖屏比例已经在 applyTabletLayout 处理) */
   /* 占位: 未来可以加大键盘高度或加大鱼尺寸 */
 }
@@ -1108,7 +1137,7 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 }
 
 /* iPad (所有方向): 关掉 grid layout, 改用 absolute 让 JS 自由布局 */
-@media (min-width: 768px) and (max-width: 1366px) and (min-height: 700px) {
+@media (min-width: 768px) and (max-width: 1400px) and (min-height: 700px) {
   #app {
     display: block;          /* 不再用 grid, 让绝对定位生效 */
   }
@@ -1264,6 +1293,7 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   gap: 8px;
   padding: 0 4px;
   margin-left: 8px;
+  flex-shrink: 0; /* v18.9: 防止 .hud__left 横向滚动时被压扁 */
 }
 .level2-badge {
   background: rgba(255, 179, 71, 0.18);
@@ -3404,18 +3434,26 @@ button:active:not(:disabled),
   gap: 14px;
   padding: 0 16px;
   z-index: 10;
+  /* v18.9 修复: 5 键原先固定 110px 宽 (总宽 638px) 在窄屏(如 iPhone SE 横屏
+     568px 宽)会溢出裁切。改用 flex-wrap 兜底 —— 正常宽度下仍是一排,
+     极窄屏才会换行, 保证任何宽度下键都完整可见可点。 */
+  flex-wrap: wrap;
+  row-gap: 10px;
 }
 .level9-key {
   position: relative;
-  width: 110px;
-  height: 70px;
+  /* v18.9 修复: 固定 110×70px 改为响应式, 下限 60px 宽/44px 高
+     (44px 是 iOS 人机指南推荐的最小可点击热区), 上限保持原设计 110px。
+     5 键 + 4×14px gap + 32px padding 一起参与计算, 保证不会溢出容器。 */
+  width: clamp(60px, calc((100% - 32px - 4 * 14px) / 5), 110px);
+  height: clamp(44px, 14vw, 70px);
   border: 3px solid rgba(155, 93, 229, 0.5);
   border-radius: 12px;
   background: linear-gradient(180deg, #2a1a4a, #1a0a3a);
   color: white;
   cursor: pointer;
   font-family: 'ZCOOL KuaiLe', sans-serif;
-  font-size: 20px;
+  font-size: clamp(14px, 4vw, 20px);
   font-weight: 900;
   display: flex;
   align-items: center;
@@ -5064,6 +5102,8 @@ body[data-theme="forest"] .btn-primary {
   font-size: 13px;
   font-weight: 900;
   border: 2px solid rgba(255, 107, 53, 0.35);
+  flex-shrink: 0; /* v18.9: 防止 .hud__left 横向滚动时被压扁 */
+  white-space: nowrap;
 }
 body[data-theme="night"] .streak-badge,
 body[data-theme="forest"] .streak-badge {
@@ -5086,6 +5126,8 @@ body[data-theme="forest"] .streak-badge {
   user-select: none;
   -webkit-user-select: none;
   transition: transform 120ms var(--ease-out-soft, cubic-bezier(0.16, 1, 0.3, 1));
+  flex-shrink: 0; /* v18.9: 防止 .hud__left 横向滚动时被压扁 */
+  white-space: nowrap;
 }
 .level-badge:active { transform: scale(0.94); }
 body[data-theme="night"] .level-badge,

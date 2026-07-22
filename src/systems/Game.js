@@ -153,6 +153,12 @@ export class Game {
       '.song-demo-overlay, .song-play-overlay, .song-score-overlay, ' +
       '.achievements-wall, .settings-panel, .tutorial, .keyboard-help, .streak-toast'
     ).forEach((el) => el.remove());
+    // v18.9: FishPool 内部给 window 绑了 resize/orientationchange 监听 (修坐标响应式问题用).
+    // 这些监听绑在 window 上, this.stage.innerHTML='' 清空 DOM 并不会自动移除它们,
+    // 不 destroy() 会导致每次切关都攒一个新监听器 (内存泄漏 + 旧回调对着已销毁的鱼操作)。
+    if (this.fishPool && typeof this.fishPool.destroy === 'function') {
+      try { this.fishPool.destroy(); } catch (_) {}
+    }
     // 清空舞台 (重建场景, 避免叠加上一关的 DOM)
     if (this.stage) this.stage.innerHTML = '';
 

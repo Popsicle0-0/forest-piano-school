@@ -18,7 +18,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.8';
+const APP_VERSION = 'v18.9';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -355,11 +355,28 @@ function disableZoom() {
   document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
   document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
   // 阻止双击放大
-  let lastTouch = 0;
+  // v18.9 修复: 原先只按时间戳判断(不分位置), 导致用户在 300ms 内快速点击
+  // 任意两个不同元素(两个 HUD 按钮/两条鱼/两张关卡卡片)时, 第二次触摸也被
+  // preventDefault 吞掉 —— 这是"点击没反应"最常见的根因。
+  // 现在同时判断时间 + 坐标距离, 只有"同一位置附近的连续触摸"才当作双击拦截。
+  let lastTouchTime = 0;
+  let lastTouchX = 0;
+  let lastTouchY = 0;
+  const DBLTAP_MAX_MS = 300;
+  const DBLTAP_MAX_DIST = 30; // px, 两次触摸中心点距离在此范围内才算"同一处"
   document.addEventListener('touchstart', (e) => {
     const now = Date.now();
-    if (now - lastTouch < 300) e.preventDefault();
-    lastTouch = now;
+    const touch = e.touches && e.touches[0];
+    const x = touch ? touch.clientX : 0;
+    const y = touch ? touch.clientY : 0;
+    const dt = now - lastTouchTime;
+    const dist = Math.hypot(x - lastTouchX, y - lastTouchY);
+    if (dt < DBLTAP_MAX_MS && dist < DBLTAP_MAX_DIST) {
+      e.preventDefault();
+    }
+    lastTouchTime = now;
+    lastTouchX = x;
+    lastTouchY = y;
   }, { passive: false });
   document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
   // 阻止多点触发的缩放
@@ -491,12 +508,18 @@ function applyPhoneLayout() {
 
 /**
  * iPad 强制布局 (v17+): 直接给元素设 inline pixel style
- * 覆盖 iPad mini 7.9" (1024×768) 到 iPad Pro 13" (1366×1024), 横竖屏
+ * 覆盖 iPad mini 7.9" (1024×768) 到 iPad Pro 13" M4 (1376×1032), 横竖屏
  * 检测: min(w,h) >= 700 && min(w,h) < 1400 && max(w,h) <= 1400
  * 比例 (v17.3 调整):
  *   - 横屏: keyboard 30vh / staff 50vh / fish 11vh / hud 5vh / bubble 4vh
  *   - 竖屏: keyboard 32vh / staff 45vh / fish 11vh / hud 6vh / bubble 6vh
  * iOS PWA 的 vh 在 iPad 上偶尔算错, 用 innerHeight 换算成 px 更稳
+ *
+ * v18.9 修复: 旧注释按 "iPad Pro 12.9\" (1366×1024)" 假设写的判断上限,
+ * 但 2024 M4 一代 "iPad Pro 13\"" 横屏实际是 1376×1032 (viewport points),
+ * CSS 里对应的 @media max-width 断点(style.css 里 3 处)之前还停在 1366px,
+ * 与这里的 JS 阈值 1400 不一致, 导致 iPad Pro 13" 横屏两边判断打架。
+ * 现已把 CSS 断点同步改成 1400px, 此处 JS 阈值不变。
  */
 function applyTabletLayout() {
   const w = window.innerWidth;
@@ -504,10 +527,10 @@ function applyTabletLayout() {
   const minSide = Math.min(w, h);
   const maxSide = Math.max(w, h);
   // iPad 检测: 700 <= minSide < 1400 && maxSide <= 1400
-  // iPhone 16 Pro landscape: 874×402 — minSide 402 < 700 → 不是 iPad
+  // iPhone 17 Pro landscape: 874×402 — minSide 402 < 700 → 不是 iPad
   // iPad mini: 1024×768 — minSide 768 ≥ 700 ✓
-  // iPad Pro 13": 1366×1024 — minSide 1024 ≥ 700 ✓
-  // iPad Pro 11": 1194×834 — minSide 834 ≥ 700 ✓
+  // iPad Pro 13" M4: 1376×1032 — minSide 1032 ≥ 700, maxSide 1376 ≤ 1400 ✓
+  // iPad Pro 11" M4: 1194×834 — minSide 834 ≥ 700 ✓
   const isTablet = minSide >= 700 && minSide < 1400 && maxSide <= 1400;
   if (!isTablet) return;
 

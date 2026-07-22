@@ -79,6 +79,65 @@ export class FishPool {
 
     // 等 DOM 布局完再定位鱼 (否则 getBoundingClientRect 全 0)
     requestAnimationFrame(() => this._placeFishes());
+
+    // v18.9 修复: 鱼的坐标是渲染时基于当次容器尺寸算好写死的绝对像素,
+    // 之前不监听 resize/orientationchange —— 用户中途转屏(横转竖/iPad 分屏
+    // 改变可用宽度)时, .fish-pool 容器尺寸会被 main.js 的 applyPhoneLayout/
+    // applyTabletLayout 重新计算, 但鱼的坐标不会跟着变, 旧坐标可能超出新容器
+    // 范围导致鱼被裁切在可视区域外, 点不到也看不到。
+    // 这里加一个防抖的 resize 监听, 只把坐标 clamp 回新容器边界内 (不重新
+    // 洗牌位置, 避免打断正在进行的游戏; 拖拽中/已锁定的鱼跳过, 避免冲突)。
+    this._onResize = () => {
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => this._clampFishesToPool(), 150);
+    };
+    window.addEventListener('resize', this._onResize);
+    window.addEventListener('orientationchange', this._onResize);
+  }
+
+  /**
+   * v18.9: 把所有"未锁定且未在拖拽中"的鱼坐标夹紧回当前 .fish-pool 容器范围内。
+   * 不重新洗牌位置(只做最小必要的边界修正), 避免打断正在进行的游戏。
+   */
+  _clampFishesToPool() {
+    if (!this.pool) return;
+    const rect = this.pool.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return;
+
+    const padL = POOL_PAD_X;
+    const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
+    const padB = rect.height - FISH_SLOT_H;
+    const maxLeft = Math.max(padL, padR);
+    const maxTop = Math.max(0, padB);
+
+    this.fishes.forEach((fish) => {
+      if (fish.locked) return;              // 已归位的鱼交给 GSAP/Game.js 管理, 不动
+      if (fish.el.classList.contains('dragging')) return;  // 拖拽中的鱼不打断
+
+      const clampedLeft = Math.min(Math.max(fish.originalLeft, padL), maxLeft);
+      const clampedTop = Math.min(Math.max(fish.originalTop, 0), maxTop);
+      if (clampedLeft === fish.originalLeft && clampedTop === fish.originalTop) return;
+
+      fish.originalLeft = clampedLeft;
+      fish.originalTop = clampedTop;
+      // 用 transition 让位置变化平滑, 而不是瞬移
+      fish.el.style.transition = 'left 200ms ease-out, top 200ms ease-out';
+      fish.el.style.left = `${clampedLeft}px`;
+      fish.el.style.top = `${clampedTop}px`;
+      setTimeout(() => { fish.el.style.transition = ''; }, 220);
+    });
+  }
+
+  /**
+   * v18.9: 停止监听 resize/orientationchange (关卡切换/teardown 时调用, 避免内存泄漏)
+   */
+  destroy() {
+    if (this._onResize) {
+      window.removeEventListener('resize', this._onResize);
+      window.removeEventListener('orientationchange', this._onResize);
+      this._onResize = null;
+    }
+    clearTimeout(this._resizeTimer);
   }
 
   // ============================================================
