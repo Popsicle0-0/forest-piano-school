@@ -105,7 +105,9 @@ cleanup_main_side() {
 
 # ---------- 4. 提交并推 main (HANDOFF §5 步骤 1-3) ----------
 hdr "阶段 A: 提交源码 + dist, 推 main"
-cp .gitignore .gitignore.bak
+# v19.1: 不再用 .bak 备份/恢复 — 孤儿分支清场(find rm)会连同未入库的
+# 备份一起删掉, checkout 回来时 mv 必然失败(v19.0 部署踩过一次)。
+# 现在阶段 C 直接幂等重写规范内容, 副本文件彻底退场。
 cat > .gitignore <<'EOF'
 node_modules
 .DS_Store
@@ -148,10 +150,21 @@ FAIL_FLAG=0
 cleanup_main_side
 
 # ---------- 6. 恢复 .gitignore 并补推 ----------
-mv .gitignore.bak .gitignore
+# 阶段 C: 幂等重写规范 .gitignore (不再依赖任何备份文件)
+cat > .gitignore <<'EOF'
+node_modules
+.DS_Store
+*.log
+*.bak
+.vite
+.cache
+.env.local
+.claude/
+docs/CREDENTIALS.md
+EOF
 if git status --porcelain | grep -q .; then
   git add -A
-  git -c core.safecrlf=false commit -m "chore: restore .gitignore"
+  git -c core.safecrlf=false commit -m "chore: 规范化 .gitignore(幂等重写, 无需备份)"
   git push origin main || warn "chore 补推失败, 下次部署时会带上去"
 else
   echo "  (.gitignore 无净变化, 跳过 chore 提交)"
