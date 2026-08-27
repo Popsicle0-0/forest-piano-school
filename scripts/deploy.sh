@@ -110,6 +110,7 @@ cat > .gitignore <<'EOF'
 node_modules
 .DS_Store
 *.log
+*.bak
 .vite
 .cache
 .env.local
@@ -148,9 +149,13 @@ cleanup_main_side
 
 # ---------- 6. 恢复 .gitignore 并补推 ----------
 mv .gitignore.bak .gitignore
-git add .gitignore
-git -c core.safecrlf=false commit -m "chore: restore .gitignore" || true
-git push origin main || warn "chore 补推失败, 下次部署时会带上去"
+if git status --porcelain | grep -q .; then
+  git add -A
+  git -c core.safecrlf=false commit -m "chore: restore .gitignore"
+  git push origin main || warn "chore 补推失败, 下次部署时会带上去"
+else
+  echo "  (.gitignore 无净变化, 跳过 chore 提交)"
+fi
 
 if [ "$FAIL_FLAG" = "1" ]; then
   die "gh-pages 发布环节出错! 源码已安全(本地+远程 main 都是新的), 只有线上页面没更新。排查: 重新跑本脚本, 或看 https://github.com/Popsicle0-0/forest-piano-school/actions"
