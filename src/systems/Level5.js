@@ -44,6 +44,36 @@ export default function startLevel5(game) {
   const hudDots = document.querySelector('.hud__dots');
   if (hudDots) hudDots.style.display = '';
 
+  // ── v19 局部样式表 ─────────────────────────────────────────────
+  // v19 删除了 main.js 的 applyPhoneLayout/applyTabletLayout JS 像素注入,
+  // 本关是"中性画布"(#stage 只是确定尺寸的盒子, 场景自挂), 没人再给
+  // PianoKeyboard 生成的 .keyboard-area 定尺寸/定位置:
+  //   1. svg.keyboard 只带 viewBox(560×220)、无宽高属性, 现代浏览器按
+  //      "拉伸适配包含块宽度"解析 → 宽屏下高度轻松超过 400px, 下半截被
+  //      stage 的 overflow:hidden 裁掉;
+  //   2. 它还是 stage 里唯一的文档流子元素 → 从顶部开始排而不是贴底,
+  //      正好叠在五线谱上。
+  // 旧版这两件事都靠 main.js 注入内联像素解决; 现在按 LAYOUT-v19 §3 的
+  // 姿势由本关注入自己的 <style> 兜底: 键盘绝对贴底 + clamp 弹性高度
+  // (档位与 style.css STACK MODE 键盘段一致), svg 显式撑满盒子。
+  // 不改 style.css (多人协作约定); teardown 时移除本表, 不泄漏给下一关。
+  const lv5StyleEl = document.createElement('style');
+  lv5StyleEl.dataset.levelStyle = '5';
+  lv5StyleEl.textContent = `
+    #stage > .keyboard-area {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: clamp(92px, 24%, 170px);
+    }
+    #stage > .keyboard-area > svg.keyboard {
+      width: 100%;
+      height: 100%;
+    }
+  `;
+  document.head.appendChild(lv5StyleEl);
+
   game.scene = new Level5Scene(game.stage);
   game.say('森林乐团要奏小星星! 看音符掉到哪个键, 就按哪个~');
 
@@ -243,6 +273,8 @@ export default function startLevel5(game) {
 
   return () => {
     if (game.scene && typeof game.scene.teardown === 'function') game.scene.teardown();
+    // v19: 摘掉本关注入的局部样式表, 键盘兜底规则不能泄漏到下一关
+    if (lv5StyleEl && lv5StyleEl.parentNode) lv5StyleEl.remove();
     const noteEl = staffArea && staffArea.querySelector('.level5-current-note');
     if (noteEl) gsap.killTweensOf(noteEl);
     game.stage.querySelectorAll('.level5-staff-area').forEach((s) => s.remove());

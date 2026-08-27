@@ -23,15 +23,23 @@ export class Waveform {
   }
 
   show() {
-    if (this.canvas) return;
-    this.canvas = document.createElement('canvas');
-    this.canvas.className = 'waveform-canvas';
-    this.canvas.width = 320;
-    this.canvas.height = 80;
-    this.stage.appendChild(this.canvas);
-    this.ctx = this.canvas.getContext('2d');
-    this._running = true;
-    this._loop();
+    // v19 审查修复: Game 构造时 show() 挂进 stage 的画布会被随后的
+    // Game.start() 清场 innerHTML='' 带走, 旧代码的 `if (this.canvas)
+    // return` 把悬空的旧引用挡在门口 → 波形从此失明且循环空转。
+    // 现在: 只要画布不在文档里就重建; 已有的 rAF 循环按属性读取
+    // this.canvas, 会自动接上新画布, 不产生第二个循环。
+    if (this.canvas && this.canvas.isConnected) return;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'waveform-canvas';
+    canvas.width = 320;
+    canvas.height = 80;
+    this.stage.appendChild(canvas);
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    if (!this._running) {
+      this._running = true;
+      this._loop();
+    }
   }
 
   hide() {

@@ -19,6 +19,50 @@
 import { Level11Scene } from '../components/Level11Scene.js';
 import { gsap } from 'gsap';
 
+const STYLE_ID = 'level11-v19-style';
+
+/**
+ * v19 适配: 本关局部布局修正 (只注入自己的 <style>, 不改 style.css, 规范§3):
+ *  1) sparkle 坐标基准 —— emitMatchSparkles() 用 viewport 坐标减
+ *     board.getBoundingClientRect() 得到"相对 board"的坐标, 但 board 一直是
+ *     static 元素, 真正的最近定位祖先是 .level11-stage, 结果粒子整体偏移了
+ *     board 在 stage 内的偏移量 (竖屏下 ≈100+px)。给 board 补 position:relative,
+ *     让 CSS 的 containing block 和 JS 的换算基准对齐。
+ *  2) 矮视口适配 —— iPhone 横屏 (~402px 高) 放不下 2×4 张 aspect-ratio:3/4 的
+ *     大卡: .level11-board 固定 min(540px,96%) 时两行卡高 ≈346px 直接被裁。
+ *     在 @media (max-height:480px) 里用「剩余高度反推板宽」(dvh 公式) 把整块
+ *     板缩进屏内, 字号同步缩小; 卡片热区仍 ≥44px (约 59×79px)。桌面 / iPad
+ *     不命中该媒体查询, 观感与 v18 完全一致 —— 顶部 padding:100px 按规范 E 条
+ *     原样保留。
+ */
+function injectStyles() {
+  if (document.getElementById(STYLE_ID)) return;
+  const s = document.createElement('style');
+  s.id = STYLE_ID;
+  s.textContent = `
+    /* 让 sparkles 的 JS 坐标换算(board rect)与实际 containing block 一致 */
+    .level11-board { position: relative; }
+    @media (max-height: 480px) {
+      .level11-stage { padding: 12px 12px 10px; gap: 8px; }
+      /* 时间条原本 top:76px 是配合 100px 顶垫的; 顶垫压到 12px 后跟随 HUD 底缘 */
+      .level11-time-bar { top: 58px; }
+      /* 板宽由"可用高度"决定: 高度≈宽*(4/3)/4*2+gap → 宽 ≤ (H-固定 chrome)*~1.45。
+         先写 vh 兜底再写 dvh, 老浏览器解析不了 dvh 时整条声明作废仍保留前一条 */
+      .level11-board {
+        gap: 8px;
+        width: min(96%, calc((100vh - 190px) * 1.45));
+        width: min(96%, calc((100dvh - 190px) * 1.45));
+      }
+      .level11-card { border-radius: 10px; }
+      .level11-card__emoji { font-size: 20px; }
+      .level11-card__name { font-size: 12px; margin-top: 2px; }
+      .level11-card__back-pattern { font-size: 22px; }
+      .level11-hud { font-size: 14px; padding: 5px 14px; }
+    }
+  `;
+  document.head.appendChild(s);
+}
+
 const CARD_NOTES = [
   { id: 'do', solfege: 'Do',  pitch: 'C4', color: '#e63946', emoji: '🍎' },
   { id: 're', solfege: 'Re',  pitch: 'D4', color: '#f4a261', emoji: '🍊' },
@@ -84,6 +128,7 @@ function shuffle(arr) {
 }
 
 export default function startLevel11(game) {
+  injectStyles();  // v19: 先落局部样式, 再渲染场景 (幂等, 由 STYLE_ID 防重)
   if (typeof window !== 'undefined') {
     window.__forestPiano = window.__forestPiano || {};
     window.__forestPiano.currentLevelId = 11;
@@ -263,7 +308,6 @@ export default function startLevel11(game) {
 
   // 10) 开场白 + 短预览 (逐张翻面然后翻回)
   game.say('翻开两张牌 — 一样的就配对! 4 对就赢~');
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
 
   // 视觉: 入场动画
   game._level11Cards.forEach((c, i) => {

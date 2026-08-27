@@ -53,8 +53,12 @@ export class PianoKeyboard {
     /** @type {Array<{id:string,solfege:string,pitch:string,note:string,color:string}>} */ this.notes = notes;
     /** @type {SVGSVGElement} */ this.svg = null;
     this._rawOnPress = null;
-    this._lastKeyTapTime = 0; // iOS 防重复触发 (250ms 内同键重复忽略)
-    // onPress 暴露为带 250ms 防抖的 wrapper, 防止 iOS 触屏偶发双击
+    this._lastKeyTapTime = 0;
+    this._lastKeyEl = null; // v19: 身份锁配套 — 只拦"同一个键"的重复触发
+    // onPress 暴露为带防抖的 wrapper。v19 审查 F-03: 旧版是整个键盘共用
+    // 一把时间戳锁, 孩子快速交替按两个键(滑奏/乱按, 每秒4-5键是常态)时
+    // 第二个键必然无声 — 注释写的"同键双击", 实现却跨键共锁。
+    // 改成与全局拦截同一哲学: 只有同一个键 250ms 内重复才拦。
     Object.defineProperty(this, 'onPress', {
       configurable: true,
       enumerable: true,
@@ -62,8 +66,9 @@ export class PianoKeyboard {
         ? (keyEl) => {
             if (typeof this._rawOnPress !== 'function') return;
             const now = Date.now();
-            if (now - this._lastKeyTapTime < 250) return;
+            if (now - this._lastKeyTapTime < 250 && this._lastKeyEl === keyEl) return;
             this._lastKeyTapTime = now;
+            this._lastKeyEl = keyEl;
             try { this._rawOnPress(keyEl); } catch (err) { console.warn(err); }
           }
         : null,

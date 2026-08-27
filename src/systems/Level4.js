@@ -36,10 +36,11 @@ const BEAT_MS = 600;
 // 一个泡泡流过屏幕的总时长 (横向动画)
 const BUBBLE_FLOW_MS = 3800;
 
-// 泡泡流过的 Y 坐标 (屏幕 30% 高, 在鼓上方)
+// 泡泡流过的 Y 坐标 (泡泡容器高度的 30%, 在鼓上方)
 const BUBBLE_Y_PCT = 0.30;
 
-// 鼓所在 X 百分比 (屏幕中央)
+// 鼓所在 X 百分比 (容器水平中央 — 场景 SVG 用 xMidYMid slice, 鼓的水平中心
+// 经裁切后仍对齐容器中心, 所以这个百分比相对容器始终成立)
 const DRUM_X_PCT = 0.50;
 
 // 敲击时间窗 (ms): 泡泡到达时刻 ±250ms 内敲击算正确
@@ -92,11 +93,6 @@ export default function startLevel4(game) {
   });
 
   const total = allBeats.length;
-  const drumX = window.innerWidth * DRUM_X_PCT;
-  const yPos = window.innerHeight * BUBBLE_Y_PCT;
-  const startX = -50;
-  const endX = window.innerWidth + 100;
-  const drumOffset = (drumX - startX) / (endX - startX);
 
   // 关卡状态
   game._level4Total = total;
@@ -107,9 +103,25 @@ export default function startLevel4(game) {
   game._level4Timeouts = [];  // 收集所有 setTimeout 以便 teardown 时清理
   game._level4CueTimers = []; // 收集 cue 脉动 setTimeout 以便 teardown 时清理
 
-  // 4) 泡泡容器
+  // 4) 泡泡容器 + 流动几何 (v19: 先建容器, 再量几何)
   game.stage.insertAdjacentHTML('beforeend', '<div class="level4-bubbles-container"></div>');
   const bubblesContainer = game.stage.querySelector('.level4-bubbles-container');
+
+  // v19 布局核心: 泡泡容器是 #stage 内的 absolute 全覆盖层 — HUD 和底部气泡
+  // 已把视口空间分走, 用 window.innerWidth/innerHeight 算百分比得到的轨迹会
+  // 整体偏离容器, 泡泡的实际位置和鼓位 cue 时间窗对不上。
+  // 改为容器实测矩形推导 (getBoundingClientRect 会同步触发布局, 此处立即可靠)。
+  // 注: 泡泡是否到达鼓位由时间轴判定 (arriveMs + HIT_WINDOW_MS), 与屏幕坐标无关,
+  //     所以换坐标系只修正视觉轨迹, 不影响玩法节奏。
+  const flowBase = bubblesContainer || game.stage;   // 容器万一取不到时退回 stage 本身
+  const flowRect = flowBase.getBoundingClientRect();
+  const flowW = flowRect.width;
+  const flowH = flowRect.height;
+  const drumX = flowW * DRUM_X_PCT;
+  const yPos = flowH * BUBBLE_Y_PCT;
+  const startX = -50;
+  const endX = flowW + 100;
+  const drumOffset = (drumX - startX) / (endX - startX);
 
   // ============================================================
   // FX 辅助函数 (在 FX 层里 spawn DOM 元素)
@@ -118,10 +130,20 @@ export default function startLevel4(game) {
   const drumAnchor = game.scene.getDrumAnchor();
   const cueLarge = game.scene.getCueLarge();
 
+  // v19: getDrumScreenCenter() 返回的是 viewport 坐标, 而 ripples/particles/+1
+  // 全部挂在 fxLayer (#stage 内 absolute inset:0) 里 — 直接用会按 HUD 高度整体
+  // 错位。统一在这里换算成"层内坐标", 各 FX 生成函数只管消费。
+  function drumCenterInLayer() {
+    const c = game.scene.getDrumScreenCenter();
+    if (!fxLayer || typeof c.x !== 'number') return c;
+    const lr = fxLayer.getBoundingClientRect();
+    return { x: c.x - lr.left, y: c.y - lr.top };
+  }
+
   // 在 drum 中心 spawn 3 道扩散 ripples
   function spawnRipples() {
     if (!fxLayer) return;
-    const c = game.scene.getDrumScreenCenter();
+    const c = drumCenterInLayer();
     for (let i = 0; i < 3; i++) {
       const ring = document.createElement('div');
       ring.className = 'level4-drum-ripple level4-drum-ripple--' + (i + 1);
@@ -135,7 +157,7 @@ export default function startLevel4(game) {
   // 从 drum 中心迸溅彩色粒子 (drops)
   function spawnParticles() {
     if (!fxLayer) return;
-    const c = game.scene.getDrumScreenCenter();
+    const c = drumCenterInLayer();
     const palette = ['#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ff9f1c'];
     const count = 12;
     for (let i = 0; i < count; i++) {
@@ -163,7 +185,7 @@ export default function startLevel4(game) {
   // 在 drum 上方 spawn "+1" 浮动分数 (绿色)
   function spawnPlusOne() {
     if (!fxLayer) return;
-    const c = game.scene.getDrumScreenCenter();
+    const c = drumCenterInLayer();
     const t = document.createElement('div');
     t.className = 'level4-floating-score level4-floating-score--plus';
     t.textContent = '+1';
@@ -176,7 +198,7 @@ export default function startLevel4(game) {
   // 在 drum 上方 spawn "-1" 红色浮动
   function spawnMinusOne() {
     if (!fxLayer) return;
-    const c = game.scene.getDrumScreenCenter();
+    const c = drumCenterInLayer();
     const t = document.createElement('div');
     t.className = 'level4-floating-score level4-floating-score--minus';
     t.textContent = '-1';

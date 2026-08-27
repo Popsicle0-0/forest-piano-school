@@ -14,6 +14,29 @@ const POOL_PAD_X = 50;   // 鱼左右边缘 padding (避免鱼靠边)
 // 单条鱼的近似可视尺寸 (Fish.js 自适应,这里只用于布局估算)
 const FISH_SLOT_W = 84;  // was 96 — 缩小 17% 让鱼更小更分散
 const FISH_SLOT_H = 64;  // was 76 — 缩小给鱼更多垂直散开空间
+const FISH_MIN_DIST = 56; // v19: 基准间距, 实际值随容器高度缩放
+
+/**
+ * v19 核心修复之一: 鱼体布局参数不再写死。
+ * 旧版直接用 84×64 常量在"鱼池只剩 ~110px 高"(iPhone 横屏/iPad 横屏的
+ * 分配结果)的容器里摆放, 数学上只装得下"一行半", 结果是 7 条鱼被钉成
+ * 一条互相重叠的水平带 (iPad 上 cyRange 直接算出负数退化成 1px)。
+ * 现在: 每次摆鱼前根据容器实测高度算缩放系数 k ∈ [0.55, 1],
+ * 所有几何常量(鱼宽高/边距/最小间距/上溢)按 k 联动缩小,
+ * 低矮容器自动变成"小鱼多行", 高容器保持原尺寸。
+ */
+function layoutMetrics(poolRect) {
+  const availH = Math.max(48, poolRect.height - 8);
+  // 以"能放下两行"为基准线; 高度充裕时 k=1 保持原设计大小
+  const k = Math.min(1, Math.max(0.55, availH / (FISH_SLOT_H * 2 + 24)));
+  return {
+    slotW: Math.round(FISH_SLOT_W * k),
+    slotH: Math.round(FISH_SLOT_H * k),
+    padX: Math.round(POOL_PAD_X * Math.min(1, Math.max(0.6, k))),
+    minDist: Math.max(44, Math.round(FISH_MIN_DIST * k)),
+    overY: Math.round(18 * k),
+  };
+}
 
 const STYLE_ID = 'forest-piano-fishpool-keyframes';
 
@@ -80,16 +103,12 @@ export class FishPool {
     // 等 DOM 布局完再定位鱼 (否则 getBoundingClientRect 全 0)
     requestAnimationFrame(() => this._placeFishes());
 
-    // v18.9 修复: 鱼的坐标是渲染时基于当次容器尺寸算好写死的绝对像素,
-    // 之前不监听 resize/orientationchange —— 用户中途转屏(横转竖/iPad 分屏
-    // 改变可用宽度)时, .fish-pool 容器尺寸会被 main.js 的 applyPhoneLayout/
-    // applyTabletLayout 重新计算, 但鱼的坐标不会跟着变, 旧坐标可能超出新容器
-    // 范围导致鱼被裁切在可视区域外, 点不到也看不到。
-    // 这里加一个防抖的 resize 监听, 只把坐标 clamp 回新容器边界内 (不重新
-    // 洗牌位置, 避免打断正在进行的游戏; 拖拽中/已锁定的鱼跳过, 避免冲突)。
+    // v18.9 起监听 resize/orientationchange; v19 升级为 _handleViewportChange:
+    // 小幅变化只把越界鱼夹回容器; 大幅变化(转屏/分屏)时对未锁定的鱼整体
+    // 重新散布(见该方法注释)。拖拽中/已锁定的鱼永远不被打断。
     this._onResize = () => {
       clearTimeout(this._resizeTimer);
-      this._resizeTimer = setTimeout(() => this._clampFishesToPool(), 150);
+      this._resizeTimer = setTimeout(() => this._handleViewportChange(), 150);
     };
     window.addEventListener('resize', this._onResize);
     window.addEventListener('orientationchange', this._onResize);
@@ -104,9 +123,11 @@ export class FishPool {
     const rect = this.pool.getBoundingClientRect();
     if (rect.width < 2 || rect.height < 2) return;
 
-    const padL = POOL_PAD_X;
-    const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;
-    const padB = rect.height - FISH_SLOT_H;
+    // v19: 用与摆鱼时同一套参数化尺寸做边界
+    const m = layoutMetrics(rect);
+    const padL = m.padX;
+    const padR = rect.width - m.padX - m.slotW;
+    const padB = rect.height - m.slotH; // 底边不越过鱼池 (上溢仅是设计彩蛋, 夹紧时不需要保留)
     const maxLeft = Math.max(padL, padR);
     const maxTop = Math.max(0, padB);
 
@@ -140,6 +161,91 @@ export class FishPool {
     clearTimeout(this._resizeTimer);
   }
 
+  /**
+   * v19: 视口变化的统一入口。
+   - 小幅变化(浏览器工具栏收展等): 仅把越界鱼夹回容器 (_clampFishesToPool)
+   - 大幅变化(横竖屏旋转 / 分屏拖动 / 窗口大改): 对"未锁定且未在拖拽中"
+     的鱼整体重新散布 — 旧版只做夹紧, 转屏后所有鱼会挤到同一条边或角上,
+     仍然没法玩。已锁定(答对归位)的鱼位置由 Game.js 管理, 不动。
+   */
+  _handleViewportChange() {
+    if (!this.pool) return;
+    const rect = this.pool.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return;
+
+    const prevH = this._lastPoolH || 0;
+    const prevW = this._lastPoolW || 0;
+    this._lastPoolH = rect.height;
+    this._lastPoolW = rect.width;
+
+    const bigChange =
+      prevH > 0 && Math.abs(rect.height - prevH) / Math.max(prevH, 1) > 0.3;
+
+    if (bigChange && this.fishes.some((f) => !f.locked)) {
+      this._redistributeUnlocked();
+    } else {
+      this._clampFishesToPool();
+    }
+  }
+
+  /** v19: 大幅视口变化时重新散布未锁定的鱼 (保留相对"随机感", 不打断游戏状态) */
+  _redistributeUnlocked() {
+    const movable = this.fishes.filter(
+      (f) => !f.locked && !f.el.classList.contains('dragging')
+    );
+    if (!movable.length) return;
+    const rect = this.pool.getBoundingClientRect();
+    const m = layoutMetrics(rect);
+    this._m = m;
+
+    // 已占用点: 锁定鱼 + 拖拽中鱼的当前中心 (新散布要避开它们)
+    const occupied = [];
+    this.fishes.forEach((f) => {
+      if (f.locked || f.el.classList.contains('dragging')) {
+        const r = f.el.getBoundingClientRect();
+        const pr = this.pool.getBoundingClientRect();
+        occupied.push({
+          x: r.left + r.width / 2 - pr.left,
+          y: r.top + r.height / 2 - pr.top,
+        });
+      }
+    });
+
+    const padL = Math.max(m.padX, m.slotW / 2);
+    const padR = rect.width - m.padX - m.slotW / 2;
+    const padT = m.slotH / 2 - m.overY;
+    const padB = rect.height - m.slotH / 2;
+    const minDistSq = m.minDist * m.minDist;
+
+    movable.forEach((fish) => {
+      let best = null;
+      let bestScore = -Infinity;
+      for (let t = 0; t < 70; t++) {
+        const cx = padL + Math.random() * Math.max(1, padR - padL);
+        const cy = padT + Math.random() * Math.max(1, padB - padT);
+        let dmin = Infinity;
+        for (const c of occupied) {
+          const dx = c.x - cx, dy = c.y - cy;
+          dmin = Math.min(dmin, dx * dx + dy * dy);
+        }
+        if (dmin >= minDistSq) { best = { cx, cy }; break; }
+        if (dmin > bestScore) { bestScore = dmin; best = { cx, cy }; }
+      }
+      if (!best) return;
+      const left = Math.round(best.cx - m.slotW / 2);
+      const top = Math.round(best.cy - m.slotH / 2);
+      fish.originalLeft = left;
+      fish.originalTop = top;
+      fish.el.style.width = `${m.slotW}px`;
+      fish.el.style.height = `${m.slotH}px`;
+      fish.el.style.transition = 'left 260ms ease-out, top 260ms ease-out';
+      fish.el.style.left = `${left}px`;
+      fish.el.style.top = `${top}px`;
+      setTimeout(() => { fish.el.style.transition = ''; }, 300);
+      occupied.push({ x: best.cx, y: best.cy });
+    });
+  }
+
   // ============================================================
   // 渲染
   // ============================================================
@@ -170,16 +276,19 @@ export class FishPool {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
-    // Poisson-disc-like: 每条新鱼至少 MIN_DIST 远离已放置的鱼
-    const OVERFLOW_X = 0;       // 鱼严格不超出左右边界 (避免靠边)
-    const OVERFLOW_Y = 18;      // 允许鱼稍微越过 fish-pool 上边 (进入 staff 区域但仍在 stage 内)
-    const padL = POOL_PAD_X;    // 50 — 左边距
-    const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;  // 严格不超出右边界
-    const padT = -OVERFLOW_Y;   // -18 → cy range 起点 (允许向上溢出)
-    const padB = rect.height - FISH_SLOT_H;  // 不超出下边界
-    const MIN_DIST = 56;        // px, 鱼中心点之间的最小间距 (84x64 鱼新尺寸适配)
+    // Poisson-disc-like: 每条新鱼至少 minDist 远离已放置的鱼
+    // v19: 全部几何量来自 layoutMetrics(rect) — 容器矮时自动缩小鱼体,
+    // 避免"7 条鱼挤成一条带"的退化布局。
+    const m = layoutMetrics(rect);
+    this._m = m; // _spawnSourceShadow 等后续读取同一套参数
+
+    const padL = m.padX;
+    const padR = rect.width - m.padX - m.slotW;
+    const padT = -m.overY;
+    const padB = rect.height - m.slotH;
+    const MIN_DIST = m.minDist;
     const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
-    const MAX_TRIES_PER_FISH = 90;  // was 80 — 给更多机会
+    const MAX_TRIES_PER_FISH = 90;
     const placedCenters = [];
 
     // Helper: candidate (cx, cy) 距所有已放置鱼是否 >= MIN_DIST
@@ -201,17 +310,18 @@ export class FishPool {
       wrap.dataset.solfege = note.solfege;
       wrap.dataset.pitch = note.pitch;
 
-      // iPad 触屏保险 (CSS 已经覆盖,这里再 inline 一次)
-      wrap.style.touchAction = 'manipulation';
+      // v19 审查 F-08: 不再 inline 写 touchAction='manipulation' —
+      // 它会反向覆盖 CSS 的 .fish{touch-action:none}, 让浏览器有机会
+      // 把单指拖拽认领成 pan 手势后 pointercancel, 症状是"拖一半鱼自己飞回去"。
       wrap.style.webkitUserSelect = 'none';
       wrap.style.userSelect = 'none';
       wrap.style.webkitTapHighlightColor = 'transparent';
 
-      // 随机中心点范围 (注意这里算的是 CENTER)
-      const cxMin = padL + FISH_SLOT_W / 2;
-      const cxMax = padR - FISH_SLOT_W / 2;
-      const cyMin = padT + FISH_SLOT_H / 2;
-      const cyMax = padB - FISH_SLOT_H / 2;
+      // 随机中心点范围 (注意这里算的是 CENTER) — v19: 用 m.* 参数化
+      const cxMin = padL + m.slotW / 2;
+      const cxMax = padR - m.slotW / 2;
+      const cyMin = padT + m.slotH / 2;
+      const cyMax = padB - m.slotH / 2;
       const cxRange = Math.max(1, cxMax - cxMin);
       const cyRange = Math.max(1, cyMax - cyMin);
 
@@ -254,12 +364,12 @@ export class FishPool {
         cy = bestCy;
       }
 
-      const left = cx - FISH_SLOT_W / 2;
-      const top = cy - FISH_SLOT_H / 2;
+      const left = cx - m.slotW / 2;
+      const top = cy - m.slotH / 2;
       wrap.style.left = `${left}px`;
       wrap.style.top = `${top}px`;
-      wrap.style.width = `${FISH_SLOT_W}px`;
-      wrap.style.height = `${FISH_SLOT_H}px`;
+      wrap.style.width = `${m.slotW}px`;
+      wrap.style.height = `${m.slotH}px`;
       placedCenters.push({ x: cx, y: cy });
 
       // 内层: 待机浮动 (CSS keyframes) + 静态旋转
@@ -337,10 +447,13 @@ export class FishPool {
     const onPointerDown = (e) => {
       // v17: 已正确放置的鱼锁定, 不让再拖
       if (fish.locked) return;
-      // 防重复点击 (iOS 触屏偶发双击)
+      // v19: 防重复只针对"同一条鱼"。旧版全池共用一把时间戳,
+      // 孩子在两条鱼之间快速切换(<250ms)时第二条会被吞 —— 与全局
+      // 拦截层的元素身份制保持同一哲学。
       const now = Date.now();
-      if (now - (this._lastTapTime || 0) < 250) return;
+      if (now - (this._lastTapTime || 0) < 250 && this._lastTapEl === el) return;
       this._lastTapTime = now;
+      this._lastTapEl = el;
       if (this._dragEnabled === false) return; // 关拖动时 (level 2) 直接忽略, 只允许 click/tap
       if (activePointer !== null) return; // 单鱼只接一个触点
       // 鼠标: 只接受左键
@@ -507,10 +620,11 @@ export class FishPool {
     // 同时绑 click 作为 iOS 兜底 (有些 PWA 只 fire click 不 fire pointerdown)
     el.addEventListener('click', (e) => {
       if (fish.locked) return;
-      // 防重复点击 (iOS 触屏偶发双击) — 同 pointerdown 共用一个时间戳
+      // 防重复点击 — 与 pointerdown 同一套"同一元素才拦截"规则
       const now = Date.now();
-      if (now - (this._lastTapTime || 0) < 250) return;
+      if (now - (this._lastTapTime || 0) < 250 && this._lastTapEl === el) return;
       this._lastTapTime = now;
+      this._lastTapEl = el;
       // iOS 单独 fire click 时 (PWA 偶尔), 这里补触发 onTap
       // Game.onTap 幂等 (playNote + GSAP scale 可重放), 双触发只是重播同一音, 可接受
       if (typeof this.onTap === 'function') {
@@ -546,8 +660,11 @@ export class FishPool {
     // 鱼色传入 CSS 变量, 让 .fish-source-shadow 拿到对应色 (默认深蓝灰兜底)
     const c = fish.note && fish.note.color ? fish.note.color : 'rgba(20,40,70,0.45)';
     shadow.style.setProperty('--shadow-color', c);
-    shadow.style.left = `${fish.originalLeft + FISH_SLOT_W / 2}px`;
-    shadow.style.top = `${fish.originalTop + FISH_SLOT_H / 2}px`;
+    // v19: 用鱼元素的实际渲染尺寸而不是编译期常量
+    const w = fish.el.offsetWidth || (this._m ? this._m.slotW : FISH_SLOT_W);
+    const h = fish.el.offsetHeight || (this._m ? this._m.slotH : FISH_SLOT_H);
+    shadow.style.left = `${fish.originalLeft + w / 2}px`;
+    shadow.style.top = `${fish.originalTop + h / 2}px`;
     this.pool.appendChild(shadow);
     setTimeout(() => {
       try { shadow.remove(); } catch (_) {}
@@ -621,13 +738,14 @@ export class FishPool {
     // 1. 为每条鱼计算新随机位置,更新 originalLeft/originalTop
     const rect = this.pool.getBoundingClientRect();
     if (rect.width >= 2 && rect.height >= 2) {
-      const OVERFLOW_X = 0;       // 鱼严格不超出左右边界 (避免靠边)
-      const OVERFLOW_Y = 18;      // 允许鱼稍微越过 fish-pool 上边 (进入 staff 区域但仍在 stage 内)
-      const padL = POOL_PAD_X;    // 50
-      const padR = rect.width - POOL_PAD_X - FISH_SLOT_W;  // 严格不超出右边界
-      const padT = -OVERFLOW_Y;   // -18
-      const padB = rect.height - FISH_SLOT_H;  // 不超出下边界
-      const MIN_DIST = 56;
+      // v19: 参数化几何
+      const m = layoutMetrics(rect);
+      this._m = m;
+      const padL = m.padX;
+      const padR = rect.width - m.padX - m.slotW;
+      const padT = -m.overY;
+      const padB = rect.height - m.slotH;
+      const MIN_DIST = m.minDist;
       const MIN_DIST_SQ = MIN_DIST * MIN_DIST;
       const MAX_TRIES_PER_FISH = 90;
 
@@ -643,10 +761,10 @@ export class FishPool {
       };
 
       this.fishes.forEach((fish) => {
-        const cxMin = padL + FISH_SLOT_W / 2;
-        const cxMax = padR - FISH_SLOT_W / 2;
-        const cyMin = padT + FISH_SLOT_H / 2;
-        const cyMax = padB - FISH_SLOT_H / 2;
+        const cxMin = padL + m.slotW / 2;
+        const cxMax = padR - m.slotW / 2;
+        const cyMin = padT + m.slotH / 2;
+        const cyMax = padB - m.slotH / 2;
         const cxRange = Math.max(1, cxMax - cxMin);
         const cyRange = Math.max(1, cyMax - cyMin);
 
@@ -689,8 +807,11 @@ export class FishPool {
           cy = bestCy;
         }
 
-        fish.originalLeft = cx - FISH_SLOT_W / 2;
-        fish.originalTop = cy - FISH_SLOT_H / 2;
+        fish.originalLeft = cx - m.slotW / 2;
+        fish.originalTop = cy - m.slotH / 2;
+        // v19: 鱼体尺寸也同步到当前参数化值 (reset 时容器可能已变化)
+        fish.el.style.width = `${m.slotW}px`;
+        fish.el.style.height = `${m.slotH}px`;
         placedCenters.push({ x: cx, y: cy });
       });
     }

@@ -60,6 +60,49 @@ export default function startLevel15(game) {
   const btnReplay = document.getElementById('btn-replay');
   if (btnReplay) btnReplay.style.display = '';
 
+  // ── v19 局部样式表 ─────────────────────────────────────────────
+  // v19 删除了 main.js 的 applyPhoneLayout/applyTabletLayout JS 像素注入,
+  // 本关是"中性画布"(#stage 只是确定尺寸的盒子, 场景自挂), 两处旧摆位失效,
+  // 按 LAYOUT-v19 §3 由本关注入 <style> 兜底 (与 L5/L6/L8 同款姿势):
+  //   1) 键盘: PianoKeyboard 的 .keyboard-area 中性画布下无尺寸约束 —
+  //      svg.keyboard 只带 viewBox(560×220)、无宽高属性, 浏览器按宽高比拉到
+  //      容器整宽 → 高度失控被裁切, 且作为唯一文档流子元素贴顶叠住五线谱。
+  //      改为绝对贴底 + clamp 弹性高度 (档位与 STACK MODE 键盘段一致),
+  //      svg 显式撑满盒子。
+  //   2) 五线谱区 .level15-staff-area: style.css 写死 top:92px/height:260px
+  //      (并非百分比锚定), iPhone 横屏舞台只剩 ~300px 高时, 底边 92+260=352
+  //      超出 stage 下缘被裁掉、下半段还压进键盘带。改为 top/bottom 双向锚定
+  //      产生确定高度并让谱面贴顶排: 桌面/iPad 竖屏下 svg 高度仍取 min(260px,…)
+  //      ——几何与旧版完全一致; 矮屏时 preserveAspectRatio="meet" 自动缩小,
+  //      完整落在键盘上方, 不再裁切。
+  // 不改 style.css (多人协作约定); teardown 时移除本表, 不泄漏给下一关。
+  const lv15StyleEl = document.createElement('style');
+  lv15StyleEl.dataset.levelStyle = '15';
+  lv15StyleEl.textContent = `
+    #stage { --lv15-kb-h: clamp(92px, 24%, 170px); }
+    #stage > .keyboard-area {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--lv15-kb-h);
+    }
+    #stage > .keyboard-area > svg.keyboard {
+      width: 100%;
+      height: 100%;
+    }
+    #stage > .level15-staff-area {
+      top: clamp(64px, 18%, 92px);
+      bottom: calc(var(--lv15-kb-h) + 10px);
+      height: auto;
+      align-items: flex-start; /* 区域被拉高时谱面贴顶, 桌面几何与旧版一致 */
+    }
+    #stage > .level15-staff-area > svg.level15-staff {
+      height: min(260px, 100%);
+    }
+  `;
+  document.head.appendChild(lv15StyleEl);
+
   // 1) 场景
   game.scene = new Level15Scene(game.stage);
 
@@ -289,8 +332,9 @@ export default function startLevel15(game) {
     setTimeout(() => { try { game.showWinOverlay(stars, 15); } catch (_) {} }, 1300);
   }
 
-  // 9) 触发布局
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
+  // 9) 布局 (v19) — 原在这里合成派发 window resize 触发的
+  // applyPhoneLayout JS 像素注入体系已整体删除, 场景也无任何 resize 监听,
+  // 合成事件只剩空转开销, 与已适配的 L5/L6/L8 一致直接移除。
 
   return () => {
     if (game._level15FallTimer) {
@@ -301,6 +345,8 @@ export default function startLevel15(game) {
       try { game.scene.teardown(); } catch (_) {}
       game.scene = null;
     }
+    // v19: 摘掉本关注入的局部样式表 (键盘贴底 + 五线谱双向锚定), 不泄漏到下一关
+    if (lv15StyleEl && lv15StyleEl.parentNode) lv15StyleEl.remove();
     if (game.stage) {
       game.stage.querySelectorAll('.level15-staff-area').forEach((el) => el.remove());
       game.stage.querySelectorAll('.level15-metronome').forEach((el) => el.remove());

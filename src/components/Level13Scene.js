@@ -42,10 +42,15 @@ export class Level13Scene {
           <rect x="-20" y="0" width="40" height="10" fill="white" rx="4" />
         </g>
 
-        <!-- Drum below -->
-        <ellipse cx="400" cy="380" rx="80" ry="20" fill="rgba(0,0,0,0.3)" />
-        <ellipse cx="400" cy="375" rx="70" ry="18" fill="#5d3a1a" />
-        <ellipse cx="400" cy="370" rx="65" ry="15" fill="#8b4513" />
+        <!-- Drum below
+             v19: 鼓面/鼓身/投影改用 data 属性标记 (data-l13-drum)。
+             Level13.js 旧版用 ellipse[cx="400"][cy="380"] 这种"按设计稿坐标
+             抓元素"的脆弱选择器 — 场景 viewBox 或几何一变选择器就悄悄失效,
+             且任何其他圆形一旦撞上同坐标会被误抓。坐标只作绘制数据,
+             JS 引用一律走语义化 data 选择器。 -->
+        <ellipse data-l13-drum="shadow" cx="400" cy="380" rx="80" ry="20" fill="rgba(0,0,0,0.3)" />
+        <ellipse data-l13-drum="shell" cx="400" cy="375" rx="70" ry="18" fill="#5d3a1a" />
+        <ellipse data-l13-drum="head" cx="400" cy="370" rx="65" ry="15" fill="#8b4513" />
         <text x="400" y="375" text-anchor="middle" font-family="ZCOOL KuaiLe" font-size="20" font-weight="900" fill="white">敲!</text>
 
         <!-- BPM counter -->

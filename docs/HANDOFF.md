@@ -1,8 +1,11 @@
-# 🎹 森林钢琴学校 — 项目交接文档 (v18.7)
+# 🎹 森林钢琴学校 — 项目交接文档
 
 > **新接手必读**:读完本文档,你应该能 100% 继续这个项目。
 >
-> **最后更新**: 2026-07-20 · 当前部署版本 **v18.7** · main HEAD `48fcf09` · gh-pages `54c2424`
+> **最后更新**: 2026-08-27 · 当前版本 **v19.0**（布局体系完全重写,详见 `docs/FIXLOG-v19.0.md` 与 `docs/LAYOUT-v19.md`）
+>
+> ⚠️ 本文档部分章节(关卡实现表/组件 API)仍描述 v18.7 状态,细节以代码为准;
+> 布局相关的一切旧说法(JS 注入像素/强制横屏)已在 v19 废除——**布局唯一规范是 `docs/LAYOUT-v19.md`**。
 
 ---
 
@@ -147,7 +150,19 @@ npm run preview    # 预览生产版
 
 ---
 
-## 5. 部署流程 (每次修改后必走)
+## 5. 部署流程
+
+### ✅ v19 起的一键方式（首选）
+
+```bash
+bash scripts/deploy.sh --yes "vX.Y: 改动描述"
+```
+
+脚本自动完成：预检(token/依赖/双处版本号一致性) → vite build → 提交源码+dist → 推 main →
+orphan 分支强刷 gh-pages(.nojekyll) → 恢复 .gitignore 补推。
+2026-08-27 已端到端验证。npm 入口：`npm run deploy`（经 scripts/deploy.cmd 找到 Git Bash）。
+
+以下手工流程保留作故障兜底：
 
 ```bash
 # 1. 改代码后,本地构建一次
@@ -199,9 +214,12 @@ git push origin main
 
 ---
 
-## 6. iOS PWA 的各种坑 (重要! 仍是事实)
+## 6. iOS PWA 的各种坑
 
-iOS Safari + 添加到主屏幕(PWA)有大量行为差异,v18.7 全部继承并继续踩坑:
+> ⚠️ **v19 重大变更**: 本章"视口/布局"小节描述的 JS 注入像素方案
+> (`applyPhoneLayout`/`applyTabletLayout`/强制横屏遮罩)已**全部删除**。
+> 布局唯一规范见 `docs/LAYOUT-v19.md`(CSS flex 核心 + .stage--stack 三段栈,
+> 竖屏一等公民)。以下保留的仍是事实的部分: 音频解锁、缓存、触摸全局行为、设备尺寸表。
 
 ### 6.1 视口/布局
 - **`<svg width="560" height="220">` HTML attribute 优先级 > CSS** → 必须删 attribute,只留 viewBox,让 CSS 完全控制

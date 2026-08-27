@@ -79,18 +79,21 @@ export default function startLevel16(game) {
   // 4) 火箭鼓 (中央)
   const drumWrap = document.createElement('div');
   drumWrap.className = 'level16-drum-wrap';
+  // v19: 动画目标鼓面打上 data 属性。JS 里不再用 ellipse[cx="100"][cy="155"]
+  // 这类"按设计稿坐标抓元素"的选择器 — 坐标属于绘制数据, 一改 JS 就静默失效;
+  // (同为 L13 data-l13-drum 的写法, 跨文件保持一致)
   drumWrap.innerHTML = `
     <svg class="level16-drum" viewBox="0 0 200 200">
       <ellipse cx="100" cy="170" rx="80" ry="14" fill="rgba(0,0,0,0.35)" />
       <ellipse cx="100" cy="160" rx="80" ry="22" fill="#5d3a1a" />
-      <ellipse cx="100" cy="155" rx="74" ry="18" fill="#8b4513" stroke="#5d3a1a" stroke-width="2" />
+      <ellipse data-l16-drum-head cx="100" cy="155" rx="74" ry="18" fill="#8b4513" stroke="#5d3a1a" stroke-width="2" />
       <text class="level16-drum-text" x="100" y="160" text-anchor="middle"
             font-family="ZCOOL KuaiLe" font-size="22" font-weight="900" fill="#fff8dc">🥁 敲!</text>
     </svg>
   `;
   root.appendChild(drumWrap);
   const drumSvg = drumWrap.querySelector('svg');
-  const drumBody = drumSvg ? drumSvg.querySelector('ellipse[cx="100"][cy="155"]') : null;
+  const drumBody = drumSvg ? drumSvg.querySelector('[data-l16-drum-head]') : null;
   const drumText = drumSvg ? drumSvg.querySelector('text') : null;
 
   // 5) 摆杆 (左上, 摆到中央触发 "click now")
@@ -333,8 +336,9 @@ export default function startLevel16(game) {
   // 9) 引导
   game.say('看摆杆 — 摆到中间时敲鼓! 越爬越快 ⏱');
 
-  // 10) 触发布局
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
+  // 10) 布局 (v19) — 原在这里合成派发 window resize 触发的
+  // applyPhoneLayout JS 像素注入体系已整体删除, 场景也无任何 resize 监听,
+  // 合成事件只剩空转开销, 与已适配的 L5/L6/L8 一致直接移除。
 
   function level16Win() {
     let stars;

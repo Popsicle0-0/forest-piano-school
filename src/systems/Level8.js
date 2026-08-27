@@ -61,6 +61,57 @@ export default function startLevel8(game) {
   const btnReplay = document.getElementById('btn-replay');
   if (btnReplay) btnReplay.style.display = '';
 
+  // ── v19 局部样式表 ─────────────────────────────────────────────
+  // 旧版本关所有摆位都靠 main.js 的 applyPhoneLayout/applyTabletLayout 在
+  // resize 时注内联像素 (文件末尾那个合成 resize dispatch 就是为它服务的,
+  // 该体系 v19 已整体删除)。按 LAYOUT-v19 §3 改由本关注入 <style> 自管:
+  // 1) 键盘: 中性画布下 .keyboard-area 无尺寸约束 — svg.keyboard 只带
+  //    viewBox(560×220), 浏览器按宽高比拉到容器整宽 → 高度失控被裁切;
+  //    且它是 stage 唯一文档流子元素会贴顶叠住选曲界面。改为绝对贴底 +
+  //    clamp 弹性高度(档位与 STACK MODE 键盘段一致), svg 显式撑满。
+  // 2) 选曲列表 .level8-song-stage: style.css 写死 top:80px 且不限高,
+  //    短横屏(舞台 ~300px 高)上 2 行卡片矩阵底部溢出 stage 被 overflow:hidden
+  //    剪掉, 第二排曲子点不到。改为上下双向锚定产生确定高度, 列表内部滚动
+  //    (卡片热区 ≥40px 不变), 桌面大屏下与原 top:80px 视觉相同。
+  // 3) 截图按钮面板原 bottom:110px 是照旧固定键盘高度估的, 转屏后可能压到
+  //    琴键; 统一改用同一把尺 (--lv8-kb-h) 悬在键盘上方。
+  // 本表 teardown 时移除, 不泄漏到其他关卡; 禁止写进 style.css。
+  const lv8StyleEl = document.createElement('style');
+  lv8StyleEl.dataset.levelStyle = '8';
+  lv8StyleEl.textContent = `
+    #stage { --lv8-kb-h: clamp(92px, 24%, 170px); }
+    #stage > .keyboard-area {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--lv8-kb-h);
+    }
+    #stage > .keyboard-area > svg.keyboard {
+      width: 100%;
+      height: 100%;
+    }
+    #stage > .level8-song-stage {
+      top: clamp(14px, 7%, 80px);
+      bottom: calc(var(--lv8-kb-h) + 14px);
+      height: auto;
+      overflow: hidden;
+    }
+    #stage .level8-song-list {
+      max-height: 100%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      /* 父容器 .level8-song-stage 是 pointer-events:none; 列表自身要能接住
+         触屏拖动才滚得动, 卡片本来就有 pointer-events:auto */
+      pointer-events: auto;
+    }
+    #stage > .level8-snapshot-panel {
+      bottom: calc(var(--lv8-kb-h) + 14px);
+    }
+  `;
+  document.head.appendChild(lv8StyleEl);
+
   // 1) 渲染场景
   game.scene = new Level8Scene(game.stage);
   game.say('森林音乐会开始! 选一首曲子~');
@@ -347,8 +398,11 @@ export default function startLevel8(game) {
     }
   }
 
-  // 5) 触发一次 resize, 让 main.js 的 applyPhoneLayout / applyTabletLayout 接管新 DOM
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
+  // v19: 旧版这里会 dispatch 一个合成 resize 事件, 让已删除的 main.js
+  // applyPhoneLayout / applyTabletLayout 来接管/摆放本关注入的新 DOM。
+  // v19 布局几何 100% 由 CSS 决定 — 本关所需的局部样式已在文件开头以
+  // <style> 注入, 插入 DOM 后即自动生效, 不再需要任何 JS 布局接管步骤,
+  // 故该 dispatch 连同其注释一并移除。
 
   return () => {
     // 清所有 setTimeout
@@ -357,6 +411,9 @@ export default function startLevel8(game) {
       game._level8Timeouts = [];
     }
     clearTimeout(cheerTimer);
+
+    // v19: 摘掉本关注入的局部样式表, 键盘/选曲列表兜底规则不泄漏到下一关
+    if (lv8StyleEl && lv8StyleEl.parentNode) lv8StyleEl.remove();
 
     game._level8Song = null;
 

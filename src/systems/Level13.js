@@ -61,7 +61,10 @@ export default function startLevel13(game) {
   const metronomeEl = game.stage.querySelector('.level13-metronome');
 
   // 5) 鼓元素引用 (点击/动画目标)
-  const drum = game.stage.querySelector('ellipse[cx="400"][cy="380"]');
+  // v19: 改用场景里显式打的 data 属性选择器, 不再按"设计稿坐标"
+  // (ellipse[cx="400"][cy="380"]) 抓元素 — 坐标变化时旧写法会静默抓空,
+  // 整关的判定/动画全部失效。data-l13-drum 由 Level13Scene.js 渲染。
+  const drum = game.stage.querySelector('[data-l13-drum="shadow"]');
 
   // 6) 游戏状态
   let bpm = 80;
@@ -200,8 +203,10 @@ export default function startLevel13(game) {
   // 13) 引导
   game.say('跟着拍子敲鼓! 速度会逐渐变快 — 完美一击拿星 ⭐');
 
-  // 14) 触发布局
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
+  // 14) 布局 (v19) — 旧版这里合成派发一次 window resize, 那是为已删除的
+  // main.js applyPhoneLayout/applyTabletLayout 像素注入体系触发布局的;
+  // v19 起布局几何全部归 CSS 且场景无任何 resize 监听, 合成事件只剩空转
+  // 开销, 与已适配的 L5/L6/L8 一致直接移除。
 
   function level13Win() {
     done = true;

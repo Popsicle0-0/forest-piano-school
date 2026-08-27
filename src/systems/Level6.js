@@ -75,6 +75,44 @@ export default function startLevel6(game) {
   hudDotEls.forEach((el) => el.classList.remove('on'));
   hudDotEls.forEach((el, i) => { if (i >= 5) el.style.display = 'none'; else el.style.display = ''; });
 
+  // ── v19 局部样式表 ─────────────────────────────────────────────
+  // v19 删除了 main.js 的 JS 像素注入布局; 本关(中性画布)两处旧摆位失效,
+  // 必须按 LAYOUT-v19 §3 由本关自己注入 <style> 兜底:
+  // 1) 键盘: .keyboard-area 在中性画布下没有任何高度约束 — svg.keyboard 只带
+  //    viewBox(560×220), 现代浏览器会把它按宽高比拉到容器整宽 → 高度失控且被
+  //    overflow:hidden 裁切; 它又是 stage 唯一的文档流子元素 → 贴顶叠住教室背景。
+  //    旧版靠 applyPhoneLayout 注入内联像素解决, 现在改为: 绝对贴底 + clamp
+  //    弹性高度 (档位与 style.css STACK MODE 键盘段一致), svg 显式撑满。
+  // 2) 和弦指示牌 .level6-chord-indicator: style.css 写死 top:280px / left:540px,
+  //    是按 800×500 设计稿给的绝对像素 — iPhone 横屏舞台高仅 ~300px、宽度约
+  //    ~870px 时, top 280 已近底部、left 540 起步的整块牌子直接推出右缘,
+  //    当前题目("Fa 上 + Do 下")根本看不见。改为容器百分比近似原相对位置,
+  //    并用 min() 保证永远悬在键盘上方、right 锚避免长文案溢出。
+  //    (信息牌 pointer-events:none 不承担交互, 触屏无 hover 不受影响)
+  // 本表 teardown 时移除, 不影响其他关卡; 禁止写进 style.css (v19 协作约定)。
+  const lv6StyleEl = document.createElement('style');
+  lv6StyleEl.dataset.levelStyle = '6';
+  lv6StyleEl.textContent = `
+    #stage { --lv6-kb-h: clamp(92px, 24%, 170px); }
+    #stage > .keyboard-area {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--lv6-kb-h);
+    }
+    #stage > .keyboard-area > svg.keyboard {
+      width: 100%;
+      height: 100%;
+    }
+    #stage .level6-chord-indicator {
+      left: auto;
+      right: max(10px, 7%);
+      top: min(calc(100% - var(--lv6-kb-h) - 60px), 54%);
+    }
+  `;
+  document.head.appendChild(lv6StyleEl);
+
   // 1) 渲染教室场景
   game.scene = new Level6Scene(game.stage);
 
@@ -358,6 +396,8 @@ export default function startLevel6(game) {
       clearTimeout(game._level6PairTimer);
       game._level6PairTimer = null;
     }
+    // v19: 摘掉本关注入的局部样式表, 键盘/指示牌兜底规则不泄漏到下一关
+    if (lv6StyleEl && lv6StyleEl.parentNode) lv6StyleEl.remove();
     // 拆场景
     if (game.scene) {
       try { game.scene.teardown(); } catch (_) {}

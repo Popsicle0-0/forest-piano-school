@@ -192,11 +192,18 @@ export class Game {
 
     const starter = levelStarters.get(levelId);
     if (starter) {
+      // v19: 先切舞台模式再渲染 — L1/L2 用三段栈, 其余关卡用中性画布。
+      // 提前切保证 FishPool 构造时的 requestAnimationFrame 测量
+      // 读到的就是最终盒子尺寸。
+      this._syncStageMode(levelId);
       try {
         const teardown = starter(this);
         this._teardownCurrentLevel = typeof teardown === 'function' ? teardown : null;
       } catch (err) {
         console.error(`Level ${levelId} failed to start:`, err);
+        // v19 审查 m1: fallback 到 L1 时必须同步切回栈模式 —
+        // 上面已经把 .stage--stack 切成了中性画布, 而 L1 的三件套依赖栈 CSS。
+        this._syncStageMode(1);
         this._fallbackToLevel1();
       }
       // v18.8: 更新 HUD 关卡徽章
@@ -206,9 +213,22 @@ export class Game {
 
     // fallback - 默认第一关
     console.warn(`Level ${levelId} not registered, falling back to Level 1`);
+    this._syncStageMode(1);
     this._startLevel1();
     // v18.8: 更新 HUD 关卡徽章 (fallback 也保证徽章同步)
     this._updateLevelBadge(1);
+  }
+
+  /**
+   * v19: 舞台模式开关。
+   * L1/L2 渲染 Staff+FishPool+Keyboard 三件套 → .stage--stack 三段栈;
+   * 其它关卡场景自管 → 中性画布 (stage 只有 flex:1 的确定尺寸)。
+   * 布局几何全部由此处的 CSS 完成, 不再依赖任何 JS 注入像素。
+   */
+  _syncStageMode(levelId) {
+    if (!this.stage) return;
+    const stacked = levelId === 1 || levelId === 2;
+    this.stage.classList.toggle('stage--stack', stacked);
   }
 
   /**
@@ -274,13 +294,15 @@ export class Game {
       }
     };
     this.fishPool.onTap = (fish) => {
-      // v18.5: 250ms 防抖 (iOS 触屏偶发双击同一鱼) — 第一次不挡
+      // v19: 防抖只拦"同一条鱼"的快速重复 — 换一条鱼立刻有声
+      // (旧版池级/Game 级共享时间戳会吞掉孩子在两条鱼之间的快速切换)
       if (this._level1FirstTap) {
-        if (Date.now() - (this._lastTapTime || 0) < 250) return;
+        if (Date.now() - (this._lastTapTime || 0) < 250 && this._lastTapEl === fish) return;
       } else {
         this._level1FirstTap = true;
       }
       this._lastTapTime = Date.now();
+      this._lastTapEl = fish;
       this._markActivity();
       if (!this.hasTappedFish) {
         this.hasTappedFish = true;
@@ -332,13 +354,14 @@ export class Game {
     this.fishPool.onTap = (fish) => {
       this._markActivity();
       if (!fish) return;
-      // 250ms 防抖 (iOS 触屏偶发双击) — 第一次点击不阻挡
+      // v19: 同鱼防重复 (跨鱼快连放行)
       if (this._level2FirstTap) {
-        if (Date.now() - (this._lastTapTime || 0) < 250) return;
+        if (Date.now() - (this._lastTapTime || 0) < 250 && this._lastTapEl === fish) return;
       } else {
         this._level2FirstTap = true;
       }
       this._lastTapTime = Date.now();
+      this._lastTapEl = fish;
       const id = fish.dataset.id;
       if (!this._level2AnswerNote) return;   // 题还没出
       this._handleLevel2Answer(id, fish);
@@ -358,8 +381,8 @@ export class Game {
     const replayBtn = document.getElementById('btn-replay-q');
     if (replayBtn) replayBtn.onclick = () => this._replayQuestion();
 
-    // 重新触发布局 (新建的 DOM 需要 main.js 的 applyPhoneLayout/applyTabletLayout 接管)
-    setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
+    // v19: 布局已全部 CSS 化 (.stage--stack 由 start() 统一切换),
+    // 不再需要"合成 resize 让 JS 重算像素"的补丁。
 
     this._updateHudProgress();
 
@@ -372,13 +395,14 @@ export class Game {
   // ============================================================
 
   _handleLevel2Answer(id, fish) {
-    // 250ms 防抖 (iOS 触屏偶发双击同一鱼) — 第一次不挡
+    // v19: 同鱼防重复; 答错的另一条鱼立刻可点(重试零等待)
     if (this._level2FirstTap) {
-      if (Date.now() - (this._lastTapTime || 0) < 250) return;
+      if (Date.now() - (this._lastTapTime || 0) < 250 && this._lastTapEl === fish) return;
     } else {
       this._level2FirstTap = true;
     }
     this._lastTapTime = Date.now();
+    this._lastTapEl = fish;
 
     if (id === this._level2AnswerNote) {
       // 答对
@@ -492,6 +516,49 @@ export class Game {
       },
     });
     map.show();
+  }
+
+  /**
+   * v19 审查 Major-1: 统一的"回地图"出口 (⌂ 按钮 / HUD 关卡徽章共用)。
+   * 必须——完整走一遍与 start() 相同的清场序列, 否则运行中的关卡
+   * 计时器/GSAP tween 会穿过地图继续跑: 实测 L12 的节拍器在按 ⌂ 后
+   * 仍每半拍咔哒作响, 直到玩家再次进关。旧 ⌂ = reload 所以从未暴露。
+   */
+  goHome() {
+    try { this.audio.stop(); } catch (_) {}
+    // 1. 摘掉当前关卡的 teardown (杀 setInterval/gsap/监听)
+    if (typeof this._teardownCurrentLevel === 'function') {
+      try { this._teardownCurrentLevel(); } catch (_) {}
+      this._teardownCurrentLevel = null;
+    }
+    // 2. FishPool 的 window 监听不走 stage 清空, 必须显式 destroy
+    if (this.fishPool && typeof this.fishPool.destroy === 'function') {
+      try { this.fishPool.destroy(); } catch (_) {}
+      this.fishPool = null;
+    }
+    // 3. 清浮层 + 清空舞台 + 回中性画布
+    document.querySelectorAll(
+      '.overlay, .level-map-overlay, .practice-room, .song-library, ' +
+      '.song-demo-overlay, .song-play-overlay, .song-score-overlay, ' +
+      '.achievements-wall, .settings-panel, .tutorial, .keyboard-help, .streak-toast'
+    ).forEach((el) => el.remove());
+    if (this.stage) this.stage.innerHTML = '';
+    if (this.stage) this.stage.classList.remove('stage--stack');
+    // 4. HUD 状态复位 (v18 遗留瑕疵 n5: L2 藏掉的进度点要还回来)
+    this._showLevel2HUD(false);
+    const dots = document.querySelector('.hud__dots');
+    if (dots) dots.style.display = '';
+    const btnReplay = document.getElementById('btn-replay');
+    if (btnReplay) btnReplay.style.display = '';
+    // 5. 重置会话状态, 等待下一次选关
+    this.placed.clear();
+    this.wrongCount = 0;
+    this.gate = false;
+    this._clearHintTimer();
+    if (typeof window !== 'undefined') {
+      try { window.__forestPiano.currentLevelId = null; } catch (_) {}
+    }
+    this._showStartOverlay();
   }
 
   _beginLevel() {

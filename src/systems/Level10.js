@@ -14,7 +14,53 @@
  *       game.audio._webAudio + game.audio._masterGain 合成 (不修改 Audio.js).
  */
 import { Level10Scene } from '../components/Level10Scene.js';
+// v19 适配修复: renderKeyboard()/highlightKey() 使用了 SVG_NS, 但本文件此前
+// 从未 import 它 —— 进入第 10 关时 renderKeyboard 直接抛 ReferenceError。
+// 与其他 Scene 文件统一从 utils/svg.js 引入, 属于纯缺陷修复, 不改玩法。
+import { SVG_NS } from '../utils/svg.js';
 import { gsap } from 'gsap';
+
+const STYLE_ID = 'level10-v19-style';
+
+/**
+ * v19 适配: 本关只在自己的 <style> 里注入局部布局修正 (不改 style.css, 规范§3):
+ *  1) [hidden] 失效 —— 浏览器 UA 样式 `[hidden]{display:none}` 会被作者样式中
+ *     同特异性的 `.level10-streak { display:flex }` 覆盖 (author origin 恒胜
+ *     UA origin), 导致连击胶囊在 streak 归零后仍常驻显示。加一条更高特异性
+ *     规则把语义恢复成代码里 `streakEl.hidden = ...` 的本意, 纯显示层修正。
+ *  2) 矮视口压缩 —— .level10-stage 的 padding-top:64px 是给旧版覆盖式 HUD 让位
+ *     的历史值; v19 起 HUD 是 #app 里 stage 之外的独立段, 这段 padding 只剩下
+ *     浪费空间的作用, 在 iPhone 横屏这类高度 ≤480px 的视口里会把「答题区 +
+ *     参考键盘」挤出屏幕。桌面/iPad 竖屏放得下, 为保证"桌面与 v18 一致",
+ *     全部压缩规则都锁进 @media (max-height:480px) 才生效, 高热区 (≥44px)
+ *     由各区自身的大按钮体积天然满足。
+ */
+function injectStyles() {
+  if (document.getElementById(STYLE_ID)) return;
+  const s = document.createElement('style');
+  s.id = STYLE_ID;
+  s.textContent = `
+    .level10-streak[hidden] { display: none; }
+    @media (max-height: 480px) {
+      /* 旧 HUD 让位用的 64px 顶垫压到 8px, 底垫同步收窄 */
+      .level10-stage { padding: 8px 12px 8px; }
+      .level10-hud { padding: 5px 12px; }
+      .level10-progress { font-size: 14px; }
+      .level10-question { font-size: 12px; }
+      .level10-regions { gap: 8px; }
+      .level10-region { padding: 8px 12px; border-radius: 14px; }
+      .level10-region__label { font-size: 17px; }
+      .level10-region__hint { font-size: 11px; margin-top: 2px; }
+      .level10-fish { font-size: 34px; }
+      .level10-keyboard { padding: 5px 10px; gap: 4px; }
+      .level10-keys-svg { height: 46px; }
+      .level10-streak__num { font-size: 14px; }
+      /* 左右两侧"高音/低音"悬浮标签贴边一些, 给被压缩的答题区让位 */
+      .level10-hint-labels { padding: 46px 0 78px; }
+    }
+  `;
+  document.head.appendChild(s);
+}
 
 const LOW_OCT  = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4'];
 const HIGH_OCT = ['C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5'];
@@ -149,6 +195,7 @@ function renderKeyboard(container, octave, theme) {
 }
 
 export default function startLevel10(game) {
+  injectStyles();  // v19: 先落局部样式, 再渲染场景 (幂等, 由 STYLE_ID 防重)
   if (typeof window !== 'undefined') {
     window.__forestPiano = window.__forestPiano || {};
     window.__forestPiano.currentLevelId = 10;
@@ -421,7 +468,6 @@ export default function startLevel10(game) {
 
   // 11) 开场白 + 触发首次布局
   game.say('听一听: Do 来自低八度还是高八度? 选对的地方放鱼~');
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
   setTimeout(() => nextQuestion(), 700);
 
   function level10Win() {

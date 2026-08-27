@@ -28,13 +28,6 @@ const NOTES_ALL = [
 // 3 座山谷平台对应的音
 const TARGET_NOTES = new Set(['do', 'mi', 'sol']);
 
-// 3 座山的 SVG 坐标 (作为 fallback — 实际用 getBoundingClientRect)
-const PLATFORM_HINTS = {
-  do:  { x: 180, y: 290 },  // 山 1 (低) - Do 位置
-  mi:  { x: 400, y: 200 },  // 山 2 (中) - Mi 位置
-  sol: { x: 620, y: 100 },  // 山 3 (高) - Sol 位置
-};
-
 // 拖拽容差 (px) — 山间距较大, 100 足够
 const SNAP_RADIUS = 130;
 

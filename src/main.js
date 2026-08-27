@@ -18,7 +18,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v18.9';
+const APP_VERSION = 'v19.0';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
@@ -90,9 +90,10 @@ function boot() {
   const hudLeftForBadge = document.querySelector('.hud__left');
   if (hudLeftForBadge) hudLeftForBadge.insertBefore(levelBadge, hudLeftForBadge.firstChild);
   // 点击徽章 → 回关卡地图 (解决"不知道怎么玩别的关卡")
+  // v19: 与 ⌂ 按钮统一走 game.goHome() — 完整清场(teardown/计时器/FishPool
+  // 监听)后再回地图。旧内联清单两处重复且漏掉关卡清理(见 FIXLOG Major-1)。
   levelBadge.addEventListener('click', () => {
-    document.querySelectorAll('.overlay, .level-map-overlay, .practice-room, .song-library, .song-demo-overlay, .song-play-overlay, .song-score-overlay, .achievements-wall, .settings-panel, .tutorial, .keyboard-help, .streak-toast').forEach((el) => el.remove());
-    game._showStartOverlay();
+    game.goHome();
   });
 
   // Add 🔥 streak badge to HUD (top)
@@ -102,24 +103,16 @@ function boot() {
   streakBadge.title = `连续 ${checkInResult.streak} 天, 最长 ${streak.get().longest}`;
   document.querySelector('.hud__left')?.appendChild(streakBadge);
 
-  // ====== 关键: 移动端 JS 强制布局 ======
-  // iOS PWA 上 CSS vh/percent 不可靠, 用 JS 直接给元素设 inline style
-  applyPhoneLayout();
-  applyTabletLayout();
-  window.addEventListener('resize', () => {
-    applyPhoneLayout();
-    applyTabletLayout();
-  });
-  window.addEventListener('orientationchange', () => {
-    setTimeout(applyPhoneLayout, 100);
-    setTimeout(applyTabletLayout, 100);
-    setTimeout(applyPhoneLayout, 400);
-    setTimeout(applyTabletLayout, 400);
-  });
-  setTimeout(applyPhoneLayout, 500);
-  setTimeout(applyTabletLayout, 500);
-  setTimeout(applyPhoneLayout, 1500);
-  setTimeout(applyTabletLayout, 1500);
+  // ============================================================
+  // v19 布局说明: 旧 applyPhoneLayout / applyTabletLayout 及其
+  // resize/orientationchange/定时器重试体系已整体删除。
+  // 布局现在 100% 由 CSS 完成 (#app flex column + .stage--stack 三段栈),
+  // 组件对视口变化的响应由各自的既有机制处理:
+  //   FishPool  → 自带 resize/orientationchange 监听 (重新散布/夹紧)
+  //   SVG 场景  → CSS 弹性尺寸自动缩放
+  // 不再存在"选关后新 DOM 没人管"的时序黑洞 — 这正是 v18 系
+  // "第一关在手机上不可玩"的首要根因。
+  // ============================================================
 
   // ====== 右上角按钮: 声音 / 重玩 / BGM / 主页 ======
   const btnSound = document.getElementById('btn-sound');
@@ -147,10 +140,12 @@ function boot() {
   }
   if (btnHome) {
     btnHome.addEventListener('click', () => {
-      // 回到开始遮罩
-      if (confirm('回到开始画面?')) {
-        location.reload();
-      }
+      // v19: 不再 confirm + location.reload()。
+      // reload 在 iOS PWA 上有顽固缓存(可能回不到新版), 而且 confirm
+      // 弹窗对儿童是纯摩擦。goHome() 会完整清场后一步直达关卡地图,
+      // 且不会像 reload 那样把运行中的关卡定时器直接甩给页面销毁 ——
+      // 是先杀干净再走 (审查 Major-1: 否则 L12 节拍器会穿地图继续响)。
+      game.goHome();
     });
   }
 
@@ -354,312 +349,31 @@ function disableZoom() {
   document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
   document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
   document.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
-  // 阻止双击放大
-  // v18.9 修复: 原先只按时间戳判断(不分位置), 导致用户在 300ms 内快速点击
-  // 任意两个不同元素(两个 HUD 按钮/两条鱼/两张关卡卡片)时, 第二次触摸也被
-  // preventDefault 吞掉 —— 这是"点击没反应"最常见的根因。
-  // 现在同时判断时间 + 坐标距离, 只有"同一位置附近的连续触摸"才当作双击拦截。
+  // v19 拦截策略(终版): 只有"300ms 内连续两次触碰同一个交互元素"才按
+  // 双击拦截。用归一化目标元素做判定, 不再看坐标距离 —— 坐标方案里
+  // 相邻两个 HUD 按钮、两条相邻的鱼中心距可能小于 30px, 依旧会误伤;
+  // 元素身份才是"双击"的本意。归一化把 SVG 内部结构(path/text/g)
+  // 归并到同一个交互单元, 避免 SVG 目标抖动绕过判断。
+  let lastNormTarget = null;
   let lastTouchTime = 0;
-  let lastTouchX = 0;
-  let lastTouchY = 0;
-  const DBLTAP_MAX_MS = 300;
-  const DBLTAP_MAX_DIST = 30; // px, 两次触摸中心点距离在此范围内才算"同一处"
+  const normTarget = (t) => {
+    try {
+      if (!t || !t.closest) return t;
+      return t.closest('button, a, .fish, .key, .level-map-tile, [role="button"]') || t;
+    } catch (_) { return t; }
+  };
   document.addEventListener('touchstart', (e) => {
     const now = Date.now();
-    const touch = e.touches && e.touches[0];
-    const x = touch ? touch.clientX : 0;
-    const y = touch ? touch.clientY : 0;
-    const dt = now - lastTouchTime;
-    const dist = Math.hypot(x - lastTouchX, y - lastTouchY);
-    if (dt < DBLTAP_MAX_MS && dist < DBLTAP_MAX_DIST) {
+    const n = normTarget(e.target);
+    if (now - lastTouchTime < 300 && n && n === lastNormTarget) {
       e.preventDefault();
     }
+    lastNormTarget = n;
     lastTouchTime = now;
-    lastTouchX = x;
-    lastTouchY = y;
   }, { passive: false });
   document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
   // 阻止多点触发的缩放
   document.addEventListener('touchmove', (e) => {
     if (e.touches && e.touches.length > 1) e.preventDefault();
   }, { passive: false });
-}
-
-/**
- * 移动端强制布局: 直接给元素设 inline style
- * 基于 window.innerHeight 算出像素值, 绕开 iOS PWA 的 CSS 计算 bug
- */
-function applyPhoneLayout() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  // phone = 较小边 ≤ 500 (iPhone 16 Pro landscape 高 402, iPad mini 高 768)
-  const isPhone = Math.min(w, h) <= 500;
-  if (!isPhone) return;  // 桌面/iPad 走 CSS grid
-
-  const isLandscape = w > h;
-  if (!isLandscape) return;
-
-  const hudH = 32;
-  const bubbleH = 44;
-  const stageH = h - hudH - bubbleH;
-
-  // HUD
-  const hud = document.querySelector('.hud');
-  if (hud) {
-    hud.style.height = hudH + 'px';
-    hud.style.minHeight = hudH + 'px';
-    hud.style.position = 'absolute';
-    hud.style.top = '0';
-    hud.style.left = '0';
-    hud.style.right = '0';
-    hud.style.zIndex = '20';
-  }
-
-  // 舞台
-  if (stage) {
-    stage.style.position = 'absolute';
-    stage.style.top = hudH + 'px';
-    stage.style.bottom = bubbleH + 'px';
-    stage.style.left = '0';
-    stage.style.right = '0';
-    stage.style.height = 'auto';
-    stage.style.display = 'block';
-    stage.style.overflow = 'hidden';
-  }
-
-  // 键盘: 30% (was 38%), 强制 min 95px
-  const kb = document.querySelector('.keyboard-area');
-  if (kb) {
-    const kbH = Math.max(95, Math.floor(stageH * 0.30));
-    kb.style.position = 'absolute';
-    kb.style.bottom = '0';
-    kb.style.left = '0';
-    kb.style.right = '0';
-    kb.style.height = kbH + 'px';
-    kb.style.minHeight = '95px';
-    kb.style.width = '100%';
-    kb.style.background = 'rgba(255, 209, 102, 0.2)';
-    kb.style.zIndex = '5';
-    kb.style.display = 'flex';
-    kb.style.alignItems = 'flex-end';
-    kb.style.justifyContent = 'center';
-    const svg = kb.querySelector('svg.keyboard');
-    if (svg) {
-      svg.style.width = '100%';
-      svg.style.height = '100%';
-      svg.style.maxWidth = '100%';
-      svg.style.maxHeight = '100%';
-      svg.style.display = 'block';
-    }
-  }
-
-  // 五线谱: 顺序分配, 给鱼留至少 110px (保证鱼有足够垂直散开空间)
-  const staff = document.querySelector('.staff-wrap');
-  if (staff) {
-    const kbH = Math.max(95, Math.floor(stageH * 0.30));
-    const staffH = Math.max(110, stageH - kbH - 110); // 给鱼留 110
-    staff.style.position = 'absolute';
-    staff.style.top = '0';
-    staff.style.left = '0';
-    staff.style.right = '0';
-    staff.style.height = staffH + 'px';
-    staff.style.minHeight = staffH + 'px';
-    staff.style.display = 'flex';
-    staff.style.alignItems = 'center';
-    staff.style.justifyContent = 'center';
-    const svg = staff.querySelector('svg.staff');
-    if (svg) {
-      svg.style.width = '100%';
-      svg.style.height = '100%';
-      svg.style.maxWidth = '100%';
-      svg.style.maxHeight = '100%';
-      svg.style.display = 'block';
-    }
-  }
-
-  // 鱼池: 剩下的, 至少 110 (保证 7 条鱼能分散开 + FISH_SLOT_H=64 能完整容纳)
-  const fishPool = document.querySelector('.fish-pool');
-  if (fishPool) {
-    const kbH = Math.max(95, Math.floor(stageH * 0.30));
-    const staffH = Math.max(110, stageH - kbH - 110); // 给鱼留 110
-    const fishH = stageH - kbH - staffH;             // 一定是 ≥ 110
-    fishPool.style.position = 'absolute';
-    fishPool.style.bottom = kbH + 'px';
-    fishPool.style.left = '0';
-    fishPool.style.right = '0';
-    fishPool.style.height = fishH + 'px';
-    fishPool.style.top = 'auto';
-    fishPool.style.pointerEvents = 'none';
-  }
-
-  // 底部气泡
-  const bubble = document.querySelector('.bubble');
-  if (bubble) {
-    bubble.style.position = 'absolute';
-    bubble.style.bottom = '0';
-    bubble.style.left = '0';
-    bubble.style.right = '0';
-    bubble.style.height = bubbleH + 'px';
-    bubble.style.minHeight = bubbleH + 'px';
-    bubble.style.padding = '4px 12px';
-    bubble.style.margin = '0';
-  }
-}
-
-/**
- * iPad 强制布局 (v17+): 直接给元素设 inline pixel style
- * 覆盖 iPad mini 7.9" (1024×768) 到 iPad Pro 13" M4 (1376×1032), 横竖屏
- * 检测: min(w,h) >= 700 && min(w,h) < 1400 && max(w,h) <= 1400
- * 比例 (v17.3 调整):
- *   - 横屏: keyboard 30vh / staff 50vh / fish 11vh / hud 5vh / bubble 4vh
- *   - 竖屏: keyboard 32vh / staff 45vh / fish 11vh / hud 6vh / bubble 6vh
- * iOS PWA 的 vh 在 iPad 上偶尔算错, 用 innerHeight 换算成 px 更稳
- *
- * v18.9 修复: 旧注释按 "iPad Pro 12.9\" (1366×1024)" 假设写的判断上限,
- * 但 2024 M4 一代 "iPad Pro 13\"" 横屏实际是 1376×1032 (viewport points),
- * CSS 里对应的 @media max-width 断点(style.css 里 3 处)之前还停在 1366px,
- * 与这里的 JS 阈值 1400 不一致, 导致 iPad Pro 13" 横屏两边判断打架。
- * 现已把 CSS 断点同步改成 1400px, 此处 JS 阈值不变。
- */
-function applyTabletLayout() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const minSide = Math.min(w, h);
-  const maxSide = Math.max(w, h);
-  // iPad 检测: 700 <= minSide < 1400 && maxSide <= 1400
-  // iPhone 17 Pro landscape: 874×402 — minSide 402 < 700 → 不是 iPad
-  // iPad mini: 1024×768 — minSide 768 ≥ 700 ✓
-  // iPad Pro 13" M4: 1376×1032 — minSide 1032 ≥ 700, maxSide 1376 ≤ 1400 ✓
-  // iPad Pro 11" M4: 1194×834 — minSide 834 ≥ 700 ✓
-  const isTablet = minSide >= 700 && minSide < 1400 && maxSide <= 1400;
-  if (!isTablet) return;
-
-  const isLandscape = w > h;
-
-  // 比例 (vh 百分比, 总和 = 100)
-  // 横屏: keyboard 30vh / staff 50vh / fish 剩余 (kb 小, staff 大, 解决"键盘太大五线谱太小")
-  // 竖屏: keyboard 32vh / staff 45vh / fish 剩余
-  let hudPct, bubblePct, kbPct, staffPct, fishPct;
-  if (isLandscape) {
-    hudPct = 0.05; bubblePct = 0.04; kbPct = 0.30; staffPct = 0.50; fishPct = 0.11;
-  } else {
-    hudPct = 0.06; bubblePct = 0.06; kbPct = 0.32; staffPct = 0.45; fishPct = 0.11;
-  }
-
-  const hudH = Math.max(40, Math.floor(h * hudPct));
-  const bubbleH = Math.max(40, Math.floor(h * bubblePct));
-  const kbH = Math.max(140, Math.floor(h * kbPct));
-  const stageH = h - hudH - bubbleH;
-  // staff + fish 共分 (stage - keyboard) 上方, staff 大头
-  const staffH = Math.max(120, Math.floor((stageH - kbH) * (staffPct / (staffPct + fishPct))));
-  const fishH = Math.max(60, stageH - kbH - staffH);
-
-  // HUD
-  const hud = document.querySelector('.hud');
-  if (hud) {
-    hud.style.position = 'absolute';
-    hud.style.top = '0';
-    hud.style.left = '0';
-    hud.style.right = '0';
-    hud.style.height = hudH + 'px';
-    hud.style.minHeight = hudH + 'px';
-    hud.style.zIndex = '20';
-  }
-
-  // 舞台
-  const stage = document.getElementById('stage');
-  if (stage) {
-    stage.style.position = 'absolute';
-    stage.style.top = hudH + 'px';
-    stage.style.bottom = bubbleH + 'px';
-    stage.style.left = '0';
-    stage.style.right = '0';
-    stage.style.height = 'auto';
-    stage.style.display = 'flex';
-    stage.style.flexDirection = 'column';
-    stage.style.overflow = 'hidden';
-  }
-
-  // 钢琴键盘 (iPad: kb 由 38vh 改为 30vh, 给 staff 腾空间)
-  const kb = document.querySelector('.keyboard-area');
-  if (kb) {
-    kb.style.position = 'absolute';
-    kb.style.bottom = '0';
-    kb.style.left = '0';
-    kb.style.right = '0';
-    kb.style.height = kbH + 'px';
-    kb.style.minHeight = '140px';
-    kb.style.width = '100%';
-    kb.style.background = 'rgba(255, 209, 102, 0.2)';
-    kb.style.zIndex = '5';
-    kb.style.display = 'flex';
-    kb.style.alignItems = 'flex-end';
-    kb.style.justifyContent = 'center';
-    kb.style.padding = '0';
-    kb.style.margin = '0';
-    const svg = kb.querySelector('svg.keyboard');
-    if (svg) {
-      svg.style.width = '100%';
-      svg.style.height = '100%';
-      svg.style.maxWidth = '100%';
-      svg.style.maxHeight = '100%';
-      svg.style.display = 'block';
-    }
-  }
-
-  // 五线谱 (键盘上方)
-  const staff = document.querySelector('.staff-wrap');
-  if (staff) {
-    staff.style.position = 'absolute';
-    staff.style.top = '0';
-    staff.style.left = '0';
-    staff.style.right = '0';
-    staff.style.height = staffH + 'px';
-    staff.style.minHeight = '120px';
-    staff.style.display = 'flex';
-    staff.style.alignItems = 'center';
-    staff.style.justifyContent = 'center';
-    staff.style.padding = '0 12px';
-    const svg = staff.querySelector('svg.staff');
-    if (svg) {
-      svg.style.width = '100%';
-      svg.style.height = '100%';
-      svg.style.maxWidth = '100%';
-      svg.style.maxHeight = '100%';
-      svg.style.display = 'block';
-    }
-  }
-
-  // 鱼池 (staff 和 keyboard 中间)
-  const fishPool = document.querySelector('.fish-pool');
-  if (fishPool) {
-    fishPool.style.position = 'absolute';
-    fishPool.style.bottom = kbH + 'px';
-    fishPool.style.left = '0';
-    fishPool.style.right = '0';
-    fishPool.style.height = fishH + 'px';
-    fishPool.style.top = 'auto';
-    fishPool.style.pointerEvents = 'none';
-  }
-
-  // 底部气泡
-  const bubble = document.querySelector('.bubble');
-  if (bubble) {
-    bubble.style.position = 'absolute';
-    bubble.style.bottom = '0';
-    bubble.style.left = '0';
-    bubble.style.right = '0';
-    bubble.style.height = bubbleH + 'px';
-    bubble.style.minHeight = bubbleH + 'px';
-    bubble.style.padding = '8px 16px';
-    bubble.style.margin = '0';
-    const text = bubble.querySelector('.bubble__text');
-    if (text) text.style.fontSize = '16px';
-    const av = bubble.querySelector('.bubble__avatar');
-    if (av) av.style.fontSize = '32px';
-  }
-
-  // 隐藏小提示鸟 (iPad 有足够空间, 不需要鸟吉祥物占位)
-  const pip = document.querySelector('.pip');
-  if (pip) pip.style.display = 'none';
 }

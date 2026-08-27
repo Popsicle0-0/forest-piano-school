@@ -53,6 +53,66 @@ export default function startLevel14(game) {
   const btnReplay = document.getElementById('btn-replay');
   if (btnReplay) btnReplay.style.display = '';
 
+  // ── v19 局部样式表 ─────────────────────────────────────────────
+  // v19 删除了 main.js 的 applyPhoneLayout/applyTabletLayout JS 像素注入,
+  // 本关是"中性画布"(#stage 只是确定尺寸的盒子, 场景自挂), 没人再给
+  // PianoKeyboard 生成的 .keyboard-area 定尺寸/定位置:
+  //   svg.keyboard 只带 viewBox(560×220)、无宽高属性, 现代浏览器按
+  //   "拉伸适配包含块宽度"解析 → 宽屏下高度轻松超过 400px 被裁切; 它还是
+  //   stage 唯一的文档流子元素 → 从顶部开始排而不是贴底, 正好叠在和弦卡上。
+  // 按 LAYOUT-v19 §3 的姿势由本关注入自己的 <style> 兜底(与 L5/L6/L8 同款):
+  //   1) 键盘绝对贴底 + clamp 弹性高度(档位与 style.css STACK MODE 键盘段一致),
+  //      svg 显式撑满盒子;
+  //   2) 短横屏(iPhone 横屏 ~402px 高, 舞台只剩 ~300px)下, .level14-stage 的
+  //      padding-top:92px + 和弦卡自然高度会顶到键盘区里, 三条鱼槽位被琴键盖住。
+  //      用 max-height 媒体查询压缩卡片留白/槽位, 保证"HUD+和弦卡+键盘"都装得下;
+  //      槽位 48px 仍满足 ≥44px 热区要求。桌面/iPad 竖屏尺寸不受影响。
+  // 不改 style.css (多人协作约定); teardown 时移除本表, 不泄漏给下一关。
+  const lv14StyleEl = document.createElement('style');
+  lv14StyleEl.dataset.levelStyle = '14';
+  lv14StyleEl.textContent = `
+    #stage { --lv14-kb-h: clamp(92px, 24%, 170px); }
+    #stage > .keyboard-area {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--lv14-kb-h);
+    }
+    #stage > .keyboard-area > svg.keyboard {
+      width: 100%;
+      height: 100%;
+    }
+    /* 矮视口(手机横屏): 卡片区让出键盘空间 */
+    @media (max-height: 520px) {
+      #stage > .level14-stage {
+        padding: 8px 12px 12px;
+        gap: 8px;
+      }
+      #stage .level14-card {
+        padding: 10px 18px;
+        gap: 8px;
+      }
+      #stage .level14-card__slots {
+        gap: 18px;
+      }
+      #stage .level14-slot {
+        width: 48px;
+        height: 48px;
+        font-size: 28px;
+      }
+      #stage .level14-card__name {
+        font-size: 20px;
+        letter-spacing: 1px;
+      }
+      #stage .level14-card__solfege {
+        font-size: 16px;
+        letter-spacing: 2px;
+      }
+    }
+  `;
+  document.head.appendChild(lv14StyleEl);
+
   // 1) 场景
   game.scene = new Level14Scene(game.stage);
 
@@ -241,14 +301,17 @@ export default function startLevel14(game) {
     setTimeout(() => { try { game.showWinOverlay(stars, 14); } catch (_) {} }, 1300);
   }
 
-  // 9) 触发布局
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
+  // 9) 布局 (v19) — 原在这里合成派发 window resize 触发的
+  // applyPhoneLayout JS 像素注入体系已整体删除, 场景也无任何 resize 监听,
+  // 合成事件只剩空转开销, 与已适配的 L5/L6/L8 一致直接移除。
 
   return () => {
     if (game.scene) {
       try { game.scene.teardown(); } catch (_) {}
       game.scene = null;
     }
+    // v19: 摘掉本关注入的局部样式表 (键盘贴底 + 短屏卡片压缩), 不泄漏到下一关
+    if (lv14StyleEl && lv14StyleEl.parentNode) lv14StyleEl.remove();
     if (game.stage) {
       game.stage.querySelectorAll('.level14-stage').forEach((el) => el.remove());
     }

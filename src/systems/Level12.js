@@ -19,12 +19,63 @@
 import { Level12Scene } from '../components/Level12Scene.js';
 import { gsap } from 'gsap';
 
+const STYLE_ID = 'level12-v19-style';
+
+/**
+ * v19 适配: 本关局部布局修正 (只注入自己的 <style>, 不改 style.css, 规范§3):
+ *  1) [hidden] 失效 —— 浏览器 UA 样式 `[hidden]{display:none}` 会被作者样式中
+ *     同特异性的 `.level12-combo { display:flex }` 盖掉 (author origin 恒胜
+ *     UA origin), 导致连击胶囊一进关就常驻显示"0 x combo"。加更高特异性的
+ *     [hidden] 规则恢复代码本意 (combo≥2 才出现), 纯显示层修正。
+ *  2) 矮视口压缩 —— 节拍器 svg 宽高比 300:380, .level12-metronome 固定
+ *     min(280px,60vw) 在 iPhone 横屏 (~402px 高) 光自身就 ~354px 高, 整列
+ *     (HUD+摆锤+切按钮+提示) 远超屏高被裁。在 @media (max-height:480px) 里按
+ *     vh 反推宽度上限并整体压缩行距与字号; 摆杆判定只依赖 phase 角度,
+ *     与像素尺寸无关 → 玩法不变。切按钮压缩后仍 54px 高 (≥44px 热区)。
+ *     桌面 / iPad (高 >480px) 不命中媒体查询, 与 v18 像素一致;
+ *     padding-top:100px 按规范 E 条原样保留。
+ */
+function injectStyles() {
+  if (document.getElementById(STYLE_ID)) return;
+  const s = document.createElement('style');
+  s.id = STYLE_ID;
+  s.textContent = `
+    .level12-combo[hidden] { display: none; }
+    @media (max-height: 480px) {
+      .level12-stage { padding: 8px 12px 10px; gap: 5px; }
+      /* 宽高比 300:380 → 高≈宽*1.27; 用 vh 给宽设上限, 保证整列放得下 */
+      .level12-metronome { width: min(200px, 52vw, 27vh); margin-top: 0; }
+      .level12-centerline { top: 6px; bottom: 6px; }
+      .level12-cut {
+        height: 54px;
+        width: min(180px, 56vw);
+        font-size: 17px;
+        border-radius: 14px;
+        border-width: 3px;
+      }
+      .level12-cut__knife { font-size: 20px; }
+      .level12-cut__label { letter-spacing: 2px; }
+      .level12-message { font-size: 12px; padding: 3px 10px; margin-top: 0; }
+      .level12-hud { font-size: 13px; padding: 5px 10px; gap: 8px; }
+      .level12-stat__icon { font-size: 14px; }
+      .level12-stat .level12-hits,
+      .level12-stat .level12-bpm { font-size: 15px; }
+      .level12-stat .level12-acc { font-size: 15px; }
+      .level12-combo { padding: 3px 12px; margin-bottom: 2px; }
+      .level12-combo__num { font-size: 17px; }
+      .level12-combo__x { font-size: 11px; }
+    }
+  `;
+  document.head.appendChild(s);
+}
+
 const TARGET_HITS = 12;     // 通关所需命中数
 const ANGLE_AMP = 35;       // 摆杆最大角度 (±度)
 const PERFECT_WIN = 0.15;   // 摆杆在中线 ±15% 内算"完美"
 const GOOD_WIN   = 0.30;    // ±30% 算"良好"
 
 export default function startLevel12(game) {
+  injectStyles();  // v19: 先落局部样式, 再渲染场景 (幂等, 由 STYLE_ID 防重)
   if (typeof window !== 'undefined') {
     window.__forestPiano = window.__forestPiano || {};
     window.__forestPiano.currentLevelId = 12;
@@ -305,7 +356,6 @@ export default function startLevel12(game) {
   game._level12Running = true;
 
   // 12) 触发布局
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 60);
 
   game.say('看摆杆 — 摆到中间时"切"! 按得快又准就是节奏高手~');
 
