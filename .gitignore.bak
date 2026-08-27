@@ -1,0 +1,8 @@
+node_modules
+.DS_Store
+*.log
+.vite
+.cache
+.env.local
+.claude/
+docs/CREDENTIALS.md

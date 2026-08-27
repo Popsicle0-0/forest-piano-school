@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "deploy": "scripts\\deploy.cmd"
   },
   "devDependencies": {
     "vite": "^5.4.0"
