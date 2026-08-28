@@ -174,9 +174,28 @@ if [ "$FAIL_FLAG" = "1" ]; then
   die "gh-pages 发布环节出错! 源码已安全(本地+远程 main 都是新的), 只有线上页面没更新。排查: 重新跑本脚本, 或看 https://github.com/Popsicle0-0/forest-piano-school/actions"
 fi
 
-# ---------- 7. 完成 ----------
+# ---------- 7. 同步阿里云 OSS (可选: 配好凭证后自动执行) ----------
+# 凭证仅存于 gitignored 的 docs/CREDENTIALS.md。若还没有 OSS 配置,
+# GitHub Pages 部署照常成功，只打印提示而不阻断发版。
+OSS_SYNC="scripts/sync-oss.py"
+if [ -f "$OSS_SYNC" ] && grep -q "AccessKey Secret:" docs/CREDENTIALS.md 2>/dev/null; then
+  hdr "阶段 C: 同步阿里云 OSS (forest-piano-kino)"
+  # 会话/环境重置可能清掉 Python 包；缺失时自动补上，不需要用户操作。
+  if ! python -c "import oss2" >/dev/null 2>&1; then
+    warn "缺少 oss2 上传组件，正在安装..."
+    python -m pip install oss2 --disable-pip-version-check --quiet || warn "oss2 安装失败"
+  fi
+  python "$OSS_SYNC" || warn "OSS 同步失败 — GitHub Pages 已成功; 检查 docs/CREDENTIALS.md/网络后运行 python scripts/sync-oss.py 重试"
+else
+  warn "未配置 OSS 凭证，跳过阿里云同步 (GitHub Pages 已照常部署)"
+fi
+
+# ---------- 8. 完成 ----------
 hdr "部署成功 🎉"
 echo "  main:     $(git log --oneline -1 | sed 's/^/  /')"
 echo "  源码版本: ${APP_V}"
-echo "  线上地址: https://popsicle0-0.github.io/forest-piano-school/"
+echo "  GitHub:   https://popsicle0-0.github.io/forest-piano-school/"
+if [ -f "$OSS_SYNC" ]; then
+  echo "  OSS:      http://piano.hrc.ac.cn (HTTPS/CDN 配好后改用 https://)"
+fi
 warn "iPhone/iPad 上如果看到的还是旧版: 从主屏幕删掉 app 重新添加 (iOS PWA 缓存最顽固)"
