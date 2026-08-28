@@ -161,6 +161,11 @@ export class Game {
     }
     // 清空舞台 (重建场景, 避免叠加上一关的 DOM)
     if (this.stage) this.stage.innerHTML = '';
+    // v19.1: Waveform 画布是 stage 的子节点, 会随上面的 innerHTML 一起
+    // 被移除。show() 会检测 isConnected 并重建, 避免切关后波形永久失明。
+    if (this.waveform && typeof this.waveform.show === 'function') {
+      this.waveform.show();
+    }
 
     // 重置状态
     this.placed.clear();
@@ -322,8 +327,17 @@ export class Game {
       this.kb.glowKey(keyEl);
     };
 
-    // 4) 展示开始遮罩(用户点击是唯一的 iOS 解锁入口)
-    this._showStartOverlay();
+    // 4) 入口分岔 (v19.1 真机修复: L1 弹回地图):
+    //    旧代码无条件 _showStartOverlay() —— 从地图选"第 1 关"后,
+    //    map.hide() → start(1) → 这里又把地图弹回去, L1 自 v18 起就
+    //    进不去。现在只有"冷启动首次进入"才展示地图; 由地图/键盘/
+    //    重玩入口进来的直接开玩 (音频已在这些入口解锁)。
+    if (this._skipStartOverlayOnce) {
+      this._skipStartOverlayOnce = false;
+      this._beginLevel();
+    } else {
+      this._showStartOverlay();
+    }
   }
 
   /**
@@ -512,6 +526,9 @@ export class Game {
         // 解锁 audio 然后启动关卡
         this.audio.unlockOnGesture().catch((e) => console.warn(e));
         map.hide();
+        // v19.1: 地图选关(含"继续上次")意味着玩家已经做出选择,
+        // L1 不能再把地图弹回来 —— 消费一次直入标记
+        this._skipStartOverlayOnce = true;
         this.start({ levelId: id });
       },
     });
@@ -1028,6 +1045,7 @@ export class Game {
 
     overlay.querySelector('#replay-btn').onclick = () => {
       overlay.remove();
+      this._skipStartOverlayOnce = true; // v19.1: 通关重玩直接进关, 不弹地图
       this.start({ levelId: wonLevel });
     };
 
@@ -1070,6 +1088,7 @@ export class Game {
     document.body.appendChild(overlay);
     overlay.querySelector('#replay-btn').onclick = () => {
       overlay.remove();
+      this._skipStartOverlayOnce = true; // v19.1: 全部完成后的重玩同样直入
       this.start({ levelId: 1 });
     };
   }

@@ -447,6 +447,11 @@ export class FishPool {
     const onPointerDown = (e) => {
       // v17: 已正确放置的鱼锁定, 不让再拖
       if (fish.locked) return;
+      // v19.1 真机修复 (L2 点不动): 关拖动的关卡(点选模式)必须在碰
+      // 时间戳锁之前退出! 否则 pointerdown 先记锁又返回, 随后浏览器
+      // 合成的 click 进来发现"250ms 内同一元素"→ 被吞, onTap 永远
+      // 不触发。点选关卡的唯一通道就是这条 click。
+      if (this._dragEnabled === false) return;
       // v19: 防重复只针对"同一条鱼"。旧版全池共用一把时间戳,
       // 孩子在两条鱼之间快速切换(<250ms)时第二条会被吞 —— 与全局
       // 拦截层的元素身份制保持同一哲学。
@@ -454,7 +459,6 @@ export class FishPool {
       if (now - (this._lastTapTime || 0) < 250 && this._lastTapEl === el) return;
       this._lastTapTime = now;
       this._lastTapEl = el;
-      if (this._dragEnabled === false) return; // 关拖动时 (level 2) 直接忽略, 只允许 click/tap
       if (activePointer !== null) return; // 单鱼只接一个触点
       // 鼠标: 只接受左键
       if (e.pointerType === 'mouse' && e.button !== 0) return;

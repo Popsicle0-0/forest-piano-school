@@ -1,4 +1,4 @@
-# 🔧 v19.0 — 布局体系完全重写 (手机/iPad 可玩性专项)
+# 🔧 v19.0 / v19.1 — 布局体系完全重写与真机热修复 (手机/iPad 可玩性专项)
 
 > **日期**: 2026-08-27
 > **触发**: 用户反馈"目前最大的问题还是布局……连第一关都完全不可玩""没办法回到第一关"，要求完全重写布局相关、以第一关为基准、手机和 iPad 都要真实可玩。
@@ -91,6 +91,21 @@ main.js 从 662 行减到 383 行；bundle 减 ~2.3kB。
 - `npx vite build` ✅ (产物正常)
 - 正确性审查确认的关键面: Game.start 流程态切换次序 ✓ FishPool 边界数学(极矮容器/全锁定/padR<padL/首帧) ✓ L13 data 属性与旧坐标选择器同元素 ✓ L15 桌面渲染几何逐像素等价声明成立(H≥532 区间) ✓ [hidden] 补救特异度必胜 ✓ #stage> 作用域对 PracticeRoom/SongLibrary 零命中 ✓
 - 真机矩阵（需用户验收）：见 §8
+
+## 7.1 v19.1 真机反馈热修复
+
+用户在 v19.0 真机反馈三项问题，均已修复：
+
+| 反馈 | 根因 | 修复 |
+|---|---|---|
+| 点第一关立即退回关卡页 | `Game._startLevel1()` 在地图选关后仍无条件调用 `_showStartOverlay()`，把刚关闭的地图重新打开 | 增加一次性 `_skipStartOverlayOnce`，地图选关/通关重玩/键盘直跳明确表示直入；冷启动仍显示地图 |
+| 第二关点鱼没反应 | `FishPool` 在 `dragEnabled=false` 时 pointerdown 先写入 250ms 防抖锁再 return，随后 iOS 合成 click 被同一锁拦截 | 点选模式在防抖前直接 return，不污染 click 通道；click 自己负责同鱼防抖 |
+| 第三关完全看不到鱼 | `.level3-background` 的不透明背景 `z-index:1` 覆盖 z-auto 鱼池 | 鱼池统一 `z-index:3`，高于背景/渐变，仍低于 HUD/浮层 |
+
+追加复核修复：
+- `Esc` 回地图改走 `Game.goHome()`，清理关卡 teardown/计时器/FishPool 监听/音频，不再让节拍器穿透地图运行。
+- 外接键盘数字直跳时调用 `unlockOnGesture()`，首次直跳也有声音。
+- Waveform 检测 stage 清场后的孤儿 canvas 并重建。
 
 ## 8. 真机验收清单 (交给用户)
 

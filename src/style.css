@@ -280,6 +280,10 @@ body::before {
   right: 0;
   bottom: 0;
   height: 30%;
+  /* v19.1 真机修复: L3 场景背景 .level3-background 带 z-index:1 + 不透明
+     渐变, 把 z-auto 的鱼池整个压在下面 —— 用户反馈"第三关看不到小鱼,
+     横屏也看不到"。鱼池统一抬到场景层之上 (场景 z 0~2, HUD 20)。 */
+  z-index: 3;
   pointer-events: none;
 }
 

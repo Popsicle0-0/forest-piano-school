@@ -37,8 +37,14 @@ export class KeyboardShortcuts {
         }
         e.preventDefault();
       } else {
-        // v18.8: 无 overlay 时, Esc = 回关卡地图 (新增体验入口)
-        if (this.game && typeof this.game._showStartOverlay === 'function') {
+        // v19.1: 无 overlay 时, Esc = 完整回关卡地图。
+        // 不能只调用 _showStartOverlay(): L12 等关卡的计时器/音频会穿过
+        // 地图继续运行。与 HUD ⌂ / 关卡徽章统一走 goHome() 清场。
+        if (this.game && typeof this.game.goHome === 'function') {
+          this.game.goHome();
+          e.preventDefault();
+          return;
+        } else if (this.game && typeof this.game._showStartOverlay === 'function') {
           this.game._showStartOverlay();
           e.preventDefault();
           return;
@@ -68,6 +74,11 @@ export class KeyboardShortcuts {
       // 1-9 = 启动对应关卡
       const levelId = parseInt(e.key, 10);
       try {
+        // v19.1: 键盘直跳意图明确, L1 不弹开始地图。
+        // 同时在首次用外接键盘直跳时解锁 Web Audio；地图选关路径原本
+        // 会在 onSelect 中解锁, 直跳没有这个手势链路。
+        this.game._skipStartOverlayOnce = true;
+        this.game.audio?.unlockOnGesture?.().catch(() => {});
         this.game.start({ levelId });
         e.preventDefault();
       } catch (err) { /* ignore */ }
