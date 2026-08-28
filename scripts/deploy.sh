@@ -157,7 +157,9 @@ FAIL_FLAG=0
   find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} + &&
   cp -r "$DEPLOY_TMP"/. . &&
   touch .nojekyll &&
-  git add . &&
+  # v20.1: 只暂存 dist 的正式根文件，绝不使用 git add .。
+  # dev server 偶发在 orphan 切换期间生成 .vite/，旧写法会把它误发到 Pages。
+  git add -f .nojekyll index.html manifest.json assets icons &&
   git -c core.safecrlf=false commit -m "$DEPLOY_MSG" &&
   git push -f origin gh-pages-clean:gh-pages
 ) || FAIL_FLAG=1
