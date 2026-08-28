@@ -87,6 +87,7 @@ export class KeyboardShortcuts {
     if (e.key === ' ') {
       // 空格 = L4/L12 鼓/切按钮
       // 委托给 L4/L12 (可以监听自定义事件或直接查询)
+      // v20.2: L4 实际监听挂在 anchor 父组，空格与真实触摸走同一入口。
       const drum = document.querySelector('.level4-drum-anchor, .level12-cut-btn');
       if (drum) {
         drum.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true}));

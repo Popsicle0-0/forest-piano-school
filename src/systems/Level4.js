@@ -356,7 +356,11 @@ export default function startLevel4(game) {
   scheduleNextBeat(800);
 
   // 6) 大鼓点击 = 敲击
-  const drum = game.scene.getDrum();
+  // v20.2: 事件必须绑在 anchor 父组，而不是透明圆或鼓面子元素。
+  // SVG 采用"后绘制元素压在前绘制元素上"的命中规则：透明 hit circle
+  // 是较早 sibling，鼓皮/绳子会截走 touch，事件不会横向冒泡给它。
+  // 绑 anchor 后，无论点鼓皮、红圈、边缘，pointerdown 都由父组统一收到。
+  const drum = game.scene.getDrumAnchor();
   const drumVisual = game.scene.getDrumVisual();
   if (drum) {
     drum.style.cursor = 'pointer';
