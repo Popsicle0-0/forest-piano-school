@@ -77,8 +77,9 @@ export default function startLevel4(game) {
   // 1) 创建场景
   game.scene = new Level4Scene(game.stage);
 
-  // 2) 开场说明
-  game.say('节奏泡泡流过来咯! 跟着节拍敲鼓! 大泡泡 = ta (1 拍), 双连泡泡 = ti-ti (2 拍连敲)');
+  // 2) 开场说明：先进入安全的教学演示，完成后才进入有计分的挑战。
+  game.say('先看一遍：只有泡泡碰到鼓的时候，才需要敲鼓~');
+  const isTeaching = !game.progress?.hasCompletedLevel?.(4);
 
   // 3) 把所有节奏模式铺平为单拍序列 (T → 1 entry; tt → 2 entries)
   const allBeats = [];
@@ -103,15 +104,18 @@ export default function startLevel4(game) {
   game._level4Correct = 0;
   game._level4Timeouts = [];  // 收集所有 setTimeout 以便 teardown 时清理
   game._level4CueTimers = []; // 收集 cue 脉动 setTimeout 以便 teardown 时清理
+  game._level4Teaching = isTeaching;
+  game._level4TutorialStep = isTeaching ? 0 : 2; // 0=观摩,1=带练,2=正式挑战
+  game._level4TutorialHits = 0;
 
   // 4) 节奏说明卡 + 泡泡容器 + 流动几何
   // v19.5: 旧版只让泡泡掠过，儿童没有明确的"现在敲/现在等"文本。
   // 状态卡永远说清当前动作；颜色与鼓面 cue 同步。
   game.stage.insertAdjacentHTML('beforeend', `
     <div class="level4-rhythm-guide" role="status" aria-live="polite">
-      <div class="level4-rhythm-guide__label">👀 看泡泡，等它碰到鼓</div>
-      <div class="level4-rhythm-guide__state">现在先等一等</div>
-      <div class="level4-rhythm-guide__count">节拍 0 / ${total}</div>
+      <div class="level4-rhythm-guide__label">${isTeaching ? '第 1 步：先看老师示范' : '节奏挑战'}</div>
+      <div class="level4-rhythm-guide__state">${isTeaching ? '👀 泡泡碰到鼓，才敲！' : '👀 看泡泡，等它碰到鼓'}</div>
+      <div class="level4-rhythm-guide__count">${isTeaching ? '现在不计分，先观察' : `节拍 0 / ${total}`}</div>
     </div>
     <div class="level4-bubbles-container"></div>
   `);
@@ -125,7 +129,10 @@ export default function startLevel4(game) {
     rhythmState.textContent = text;
   };
   const updateRhythmCount = () => {
-    if (rhythmCount) rhythmCount.textContent = `节拍 ${game._level4Processed} / ${total}`;
+    if (!rhythmCount) return;
+    if (game._level4TutorialStep === 0) rhythmCount.textContent = '现在不计分，先观察';
+    else if (game._level4TutorialStep === 1) rhythmCount.textContent = `跟着试两拍 ${game._level4TutorialHits} / 2`;
+    else rhythmCount.textContent = `节拍 ${game._level4Processed} / ${total}`;
   };
 
   // v19 布局核心: 泡泡容器是 #stage 内的 absolute 全覆盖层 — HUD 和底部气泡
@@ -235,7 +242,10 @@ export default function startLevel4(game) {
     // 大型红环 + 目标环 + 鼓面色变金 (by class, auto-removed after pulse)
     if (drumAnchor) drumAnchor.classList.add('level4-cue-now');
     if (cueLarge) cueLarge.classList.add('level4-cue-active');
-    setRhythmGuide('hit', '🥁 现在敲鼓！');
+    const teachingText = game._level4TutorialStep === 0
+      ? '👀 看！泡泡碰到鼓了'
+      : '🥁 现在敲鼓！';
+    setRhythmGuide('hit', teachingText);
     // 预响: 轻盈气泡, 提醒孩子准备敲
     try { game.audio.hover(); } catch (_) {}
     // 自动清除
@@ -313,15 +323,27 @@ export default function startLevel4(game) {
       if (remainingIdx >= 0) {
         // 漏敲: pending 还在 = 没敲
         game._level4Pending.splice(remainingIdx, 1);
-        game.wrongCount++;
-        game.audio.wrong();
-        spawnMinusOne();
-        // 漏敲时也清除 cue 状态
+        // 教学观摩阶段漏拍不扣分，只明确告诉孩子刚才正是该敲的时刻。
+        if (game._level4TutorialStep === 0) {
+          setRhythmGuide('teach', '✨ 刚才就是“该敲”的时刻');
+          game.say('看见了吗？泡泡碰到鼓时，鼓会亮起来。下一次轮到你试试！');
+          game._level4TutorialStep = 1;
+          if (rhythmGuide) rhythmGuide.querySelector('.level4-rhythm-guide__label').textContent = '第 2 步：跟着亮鼓试两拍';
+          updateRhythmCount();
+          game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 等鼓亮起来再敲'), 900));
+        } else {
+          game.wrongCount++;
+          game.audio.wrong();
+          spawnMinusOne();
+        }
+        // 漏敲时也清除 cue 状态。观摩阶段刚转入带练时不覆盖教学文案。
         if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
         if (cueLarge) cueLarge.classList.remove('level4-cue-active');
-        setRhythmGuide('miss', '❌ 漏了一拍，下一颗再试');
-        game.say('咦, 漏了一拍! 跟着泡泡到鼓位再敲');
-        game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 看下一颗泡泡，先等一等'), 700));
+        if (game._level4TutorialStep !== 1 || game._level4TutorialHits > 0) {
+          setRhythmGuide('miss', '❌ 漏了一拍，下一颗再试');
+          game.say('咦, 漏了一拍! 跟着泡泡到鼓位再敲');
+          game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 看下一颗泡泡，先等一等'), 700));
+        }
       }
 
       // 通关?
@@ -368,6 +390,21 @@ export default function startLevel4(game) {
       const now = Date.now();
       const matched = game._level4Pending.filter((p) => Math.abs(now - p.when) < HIT_WINDOW_MS);
       if (matched.length > 0) {
+        // 正确。教学第二步要求先跟亮鼓成功两次；达到后才把状态卡收成小角标，
+        // 后续只保留鼓亮/泡泡的非文字线索，完成“先教学，后不提示”。
+        if (game._level4TutorialStep === 1) {
+          game._level4TutorialHits++;
+          if (game._level4TutorialHits >= 2) {
+            game._level4TutorialStep = 2;
+            if (rhythmGuide) {
+              rhythmGuide.classList.add('level4-rhythm-guide--compact');
+              rhythmGuide.querySelector('.level4-rhythm-guide__label').textContent = '节奏挑战';
+            }
+            setRhythmGuide('good', '🌟 学会啦，听鼓亮再敲！');
+            game.say('学会啦！接下来跟着泡泡和亮鼓自己试试~');
+          }
+          updateRhythmCount();
+        }
         // 正确
         game._level4Correct++;
         game._level4Pending = game._level4Pending.filter((p) => !matched.includes(p));
@@ -379,11 +416,20 @@ export default function startLevel4(game) {
         // 清除 cue 状态
         if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
         if (cueLarge) cueLarge.classList.remove('level4-cue-active');
-        setRhythmGuide('good', '✅ 对上啦！继续看下一颗');
+        const isChallenge = game._level4TutorialStep === 2;
+        setRhythmGuide('good', isChallenge ? '✅' : '✅ 对上啦！继续看下一颗');
         const praises = ['咚!', '咚!咚!', '完美!', '棒呀!', '节拍对!'];
-        game.say(praises[Math.min(game._level4Correct - 1, praises.length - 1)]);
-        game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 看下一颗泡泡，先等一等'), 560));
+        if (!isChallenge || game._level4TutorialHits === 2) {
+          game.say(praises[Math.min(game._level4Correct - 1, praises.length - 1)]);
+        }
+        game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', isChallenge ? '🎵' : '👀 看下一颗泡泡，先等一等'), 560));
       } else {
+        // 教学观摩阶段的随手敲不处罚，只温柔提醒“等鼓亮”。
+        if (game._level4TutorialStep === 0) {
+          setRhythmGuide('teach', '👀 先等泡泡碰到鼓');
+          game.say('现在先看一看，等鼓亮起来再敲~');
+          return;
+        }
         // 错敲: 无 pending 拍子匹配
         game.wrongCount++;
         try { game.audio.wrong(); } catch (_) {}

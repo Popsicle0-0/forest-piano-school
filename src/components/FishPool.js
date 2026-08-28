@@ -32,9 +32,12 @@ const FISH_MIN_DIST = 72; // 必须 >= 视觉鱼宽，不能再用 56 让实体�
  */
 function layoutMetrics(poolRect) {
   const availH = Math.max(48, poolRect.height - 8);
-  // 以"能放下两行"为基准线; 视觉鱼已由 inner 缩放，故下限 0.62
-  // 仍保留足够触控热区，避免短屏把鱼缩成不可抓的小点。
-  const k = Math.min(1, Math.max(0.62, availH / (FISH_SLOT_H * 2 + 24)));
+  // v20: 尺寸取决于真实鱼池，而不是一个永远 <=1 的常量。
+  // 小横屏先由高度限制避免重叠；iPad/大屏池子变高、变宽时可增长到 1.25 倍，
+  // 因此不会出现"所有设备上的鱼一样小"，也不会在短屏挤成一团。
+  const byHeight = availH / (FISH_SLOT_H * 2 + 24);
+  const byWidth = Math.max(0.62, poolRect.width / 520);
+  const k = Math.min(1.25, Math.max(0.62, Math.min(byHeight, byWidth)));
   return {
     slotW: Math.round(FISH_SLOT_W * k),
     slotH: Math.round(FISH_SLOT_H * k),
@@ -53,6 +56,7 @@ function injectStyles() {
   s.id = STYLE_ID;
   s.textContent = `
     .fish-inner {
+      position: relative; /* 给 Fish.js 返回的内层 .fish 一个正确的定位参照 */
       transform-origin: 50% 50%;
       will-change: transform;
       /* v19.3: 内层缩小，外层 wrapper 保持完整手指热区 */
@@ -62,6 +66,14 @@ function injectStyles() {
       pointer-events: none; /* 事件穿透到 .fish wrapper */
     }
     .fish-inner > * {
+      /* Fish.js 返回的节点本身也叫 .fish，会被全局 .fish-pool .fish
+         规则选中成 absolute。v20 显式让它回到 inner 的盒子里，
+         每条鱼才真正跟随各自 wrapper 坐标，不会堆叠到同一定位上下文。 */
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      width: 100% !important;
+      height: 100% !important;
       pointer-events: none;
     }
     /* v17.6: 浮动动画放在 wrapper (.fish) 上, 让 hit area 跟随视觉位置
@@ -93,11 +105,12 @@ export class FishPool {
    * @param {HTMLElement} root 舞台 (stage) 容器
    * @param {Array<{id, solfege, pitch, note, color}>} notes 7 条鱼元数据
    */
-  constructor(root, notes) {
+  constructor(root, notes, { fishDisplay = {} } = {}) {
     injectStyles();
 
     this.stage = root;        // 保留原 stage 引用 (备用)
     this.notes = notes;
+    this.fishDisplay = fishDisplay; // 例如 L3 的 { showLabel:false }，避免视觉泄题。
     this.fishes = [];         // [{ el, inner, note, originalLeft, originalTop, rot }]
     this.onDrop = null;       // (fishEl, slotEl, accepted) => void
     this.onDragStart = null;  // (fishEl) => void  可选 (触发 hover 音)
@@ -262,6 +275,7 @@ export class FishPool {
   _renderPool() {
     const pool = document.createElement('div');
     pool.className = 'fish-pool';
+    if (this.fishDisplay.showLabel === false) pool.classList.add('fish-pool--no-label');
     pool.setAttribute('aria-label', '小鱼池');
     this.stage.appendChild(pool);
     this.pool = pool;
@@ -397,7 +411,7 @@ export class FishPool {
       // Fish.js 内容 (兼容多种返回形式)
       let fishContent = null;
       try {
-        const inst = new Fish(note);
+        const inst = new Fish(note, this.fishDisplay);
         if (inst && inst.nodeType === 1) fishContent = inst;
         else fishContent = inst?.root || inst?.element || inst?.svg || null;
       } catch (err) {
@@ -543,10 +557,11 @@ export class FishPool {
             nearest = s;
           }
         });
-        // 只在变化时回调,减少抖动
-        if (nearest !== this._lastHoveredSlot) {
+        // L1/L2 有 staff slot，目标变化时才回调即可；L3 一类自定义目标关
+        // 没有 staff slot，需要每次 move 都携带手指坐标自行找最近山。
+        if (slots.length === 0 || nearest !== this._lastHoveredSlot) {
           this._lastHoveredSlot = nearest;
-          try { this.onDragMove(el, nearest); } catch (err) { console.warn(err); }
+          try { this.onDragMove(el, nearest, { x: e.clientX, y: e.clientY }); } catch (err) { console.warn(err); }
         }
       }
     };
@@ -573,7 +588,7 @@ export class FishPool {
 
         if (typeof this.onDragMove === 'function') {
           this._lastHoveredSlot = null;
-          try { this.onDragMove(el, null); } catch (err) { console.warn(err); }
+          try { this.onDragMove(el, null, null); } catch (err) { console.warn(err); }
         }
         if (typeof this.onTap === 'function') {
           try { this.onTap(el); } catch (err) { console.warn(err); }

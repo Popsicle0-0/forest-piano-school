@@ -102,6 +102,11 @@ export class Progress {
    * @param {string|number} levelId
    * @param {number} starsEarned 本次获得的星
    */
+  /** 是否已通关过某关（仅决定教学提示是否简化，不保存中间操作状态）。 */
+  hasCompletedLevel(levelId) {
+    return this.state.completedLevels.includes(String(levelId));
+  }
+
   markLevelComplete(levelId, starsEarned) {
     const id = String(levelId);
     const earn = Math.max(0, Number(starsEarned) || 0);

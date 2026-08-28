@@ -66,8 +66,9 @@ export class Fish {
    * @param {{id:string,solfege:string,pitch:string,note:string,color:string}} noteMeta
    * @returns {HTMLElement} div.fish
    */
-  constructor(noteMeta) {
+  constructor(noteMeta, { showLabel = true } = {}) {
     this.note = noteMeta;
+    this.showLabel = showLabel;
     const el = document.createElement('div');
     el.className = 'fish';
     el.dataset.id = noteMeta.id;
@@ -89,6 +90,7 @@ export class Fish {
 
   render() {
     const { id, color, solfege, pitch } = this.note;
+    const { showLabel } = this;
     const idKey = (id || 'do').toLowerCase();
 
     // 大幅随机化 — 每条鱼都是独特的角色 (±15° + 大小变化 + 泡泡/腮红变化)
@@ -435,21 +437,23 @@ export class Fish {
           <!-- 配饰 (按 note.id 切换: 蝴蝶结/帽子/皇冠/耳环) -->
           ${accessorySvg}
 
-          <!-- 大字唱名 (Do/Re/Mi/...) -->
-          <text class="fish-label" x="44" y="48"
-                font-family="'ZCOOL KuaiLe', 'Baloo 2', sans-serif"
-                font-size="20" font-weight="900"
-                fill="white" stroke="rgba(0,0,0,0.7)" stroke-width="2.5"
-                paint-order="stroke" text-anchor="middle"
-                style="pointer-events: none;">${solfege}</text>
+          ${showLabel ? `
+            <!-- 大字唱名 (Do/Re/Mi/...) -->
+            <text class="fish-label" x="44" y="48"
+                  font-family="'ZCOOL KuaiLe', 'Baloo 2', sans-serif"
+                  font-size="20" font-weight="900"
+                  fill="white" stroke="rgba(0,0,0,0.7)" stroke-width="2.5"
+                  paint-order="stroke" text-anchor="middle"
+                  style="pointer-events: none;">${solfege}</text>
 
-          <!-- 小字音名 (C4/D4/...) -->
-          <text class="fish-name-en" x="44" y="60"
-                font-family="'Nunito', sans-serif"
-                font-size="8" font-weight="700"
-                fill="rgba(255,255,255,0.95)" stroke="rgba(0,0,0,0.5)" stroke-width="0.5"
-                paint-order="stroke" text-anchor="middle"
-                style="pointer-events: none;">${pitch}</text>
+            <!-- 小字音名 (C4/D4/...) -->
+            <text class="fish-name-en" x="44" y="60"
+                  font-family="'Nunito', sans-serif"
+                  font-size="8" font-weight="700"
+                  fill="rgba(255,255,255,0.95)" stroke="rgba(0,0,0,0.5)" stroke-width="0.5"
+                  paint-order="stroke" text-anchor="middle"
+                  style="pointer-events: none;">${pitch}</text>
+          ` : ''}
         </g>
       </svg>
     `;

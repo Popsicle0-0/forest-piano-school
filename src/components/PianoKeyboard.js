@@ -92,11 +92,11 @@ export class PianoKeyboard {
         <g class="key key--white" data-pitch="${n.pitch}" data-id="${n.id}" style="${TOUCH_NONE}">
           <path class="key__shape" d="${d}"
                 fill="#fdfbf5" stroke="#d8d2c0" stroke-width="1.2" stroke-linejoin="round"/>
-          <text class="key__label" x="${cx}" y="184" text-anchor="middle"
+          <text class="key__label key__label--svg" x="${cx}" y="184" text-anchor="middle"
                 font-family="'ZCOOL KuaiLe', 'Baloo 2', sans-serif"
                 font-size="18" font-weight="800" fill="#3d405b"
                 style="pointer-events: none;">${n.note}</text>
-          <text class="key__label" x="${cx}" y="206" text-anchor="middle"
+          <text class="key__label key__label--svg" x="${cx}" y="206" text-anchor="middle"
                 font-family="'ZCOOL KuaiLe', 'Baloo 2', sans-serif"
                 font-size="14" font-weight="500" fill="#6b7280"
                 style="pointer-events: none;">${n.solfege}</text>
@@ -117,6 +117,15 @@ export class PianoKeyboard {
       `;
     });
 
+    // v20: 白键图形在移动端可横向铺满，但 SVG 内 <text> 会随
+    // preserveAspectRatio="none" 被非等比拉伸。把可见唱名/音名改成
+    // 普通 DOM 网格文本：字体始终保持正确比例，SVG 内旧文本只作结构回退。
+    const labels = this.notes.map((n) => `
+      <span class="keyboard-label" aria-hidden="true">
+        <b>${n.note}</b><small>${n.solfege}</small>
+      </span>
+    `).join('');
+    wrap.style.setProperty('--key-count', String(this.notes.length));
     wrap.innerHTML = `
       <svg class="keyboard" xmlns="${SVG_NS}"
            viewBox="0 0 ${KBD_W} ${WHITE_H}"
@@ -124,6 +133,7 @@ export class PianoKeyboard {
            aria-label="钢琴键盘(C4-B4)">
         ${inner}
       </svg>
+      <div class="keyboard-labels">${labels}</div>
     `;
 
     this.root.appendChild(wrap);

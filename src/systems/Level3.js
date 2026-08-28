@@ -1,39 +1,25 @@
 /**
- * Level 3: 五声音阶山谷
+ * Level 3: 五声音阶山谷 — 听一听，再放一放
  *
- * 7 条鱼散布在场景下半 (Do, Re, Mi, Fa, Sol, La, Si), 但只有 3 条
- * 是 Do Mi Sol — 玩家找出这 3 条并拖到对应高度的山谷台阶.
- * 通关条件: 3 个山上都放了正确的鱼.
- *
- * 增强 (v17.x polish):
- *  - Distractor (Re/Fa/La/Si) 拖到山 → 3 座山整体抖动 + 鱼被更狠弹回 + 强提示
- *  - 答对时, 在山脚触发金色粒子绽放 (DOM sparkle 圈)
- *  - 进度推进时, 场景切换 .level3-progress-N 触发日落渐变 (亮黄 → 暖橙 → 紫橙 → 星空)
+ * 教学顺序（Suzuki + Kodály）：
+ *   先点小鱼试听 → 感受高低 → 把已试听的小鱼放到相应高度的山。
+ * 鱼与山在匹配前均不显示唱名/音名，也不用颜色泄露答案；答对后才揭晓唱名。
  */
 import { Level3Scene } from '../components/Level3Scene.js';
 import { FishPool } from '../components/FishPool.js';
 import { gsap } from 'gsap';
 
-// 7 条鱼 (Do Re Mi Fa Sol La Si) — 全用真实 C 大调元数据
-const NOTES_ALL = [
+// 五声音阶：完整、旋律性强，避免把 Fa/Si 的半音倾向过早塞给启蒙关。
+const L3_NOTES = [
   { id: 'do',  solfege: 'Do',  pitch: 'C4', note: 'C', color: '#e63946' },
   { id: 're',  solfege: 'Re',  pitch: 'D4', note: 'D', color: '#f4a261' },
   { id: 'mi',  solfege: 'Mi',  pitch: 'E4', note: 'E', color: '#ffc971' },
-  { id: 'fa',  solfege: 'Fa',  pitch: 'F4', note: 'F', color: '#b5c99a' },
   { id: 'sol', solfege: 'Sol', pitch: 'G4', note: 'G', color: '#457b9d' },
   { id: 'la',  solfege: 'La',  pitch: 'A4', note: 'A', color: '#6a4c93' },
-  { id: 'si',  solfege: 'Si',  pitch: 'B4', note: 'B', color: '#9b5de5' },
 ];
 
-// 3 座山谷平台对应的音
-const TARGET_NOTES = new Set(['do', 'mi', 'sol']);
-
-// v19.5: 山的平台视觉宽约 120px，横竖屏 SVG 缩放后 130px 容差会
-// 让孩子必须精确点到很窄的台面；放宽到 170px 让孩子落在有色平台附近即可，
-// 但仍通过 "鱼 id === 山 id" 保证不会错误匹配。
-const SNAP_RADIUS = 170;
-
-const ENCOURAGE = ['真棒!', '太厉害了~', '不错哟!'];
+const TARGET_IDS = new Set(L3_NOTES.map((note) => note.id));
+const TARGET_RADIUS = 125; // 真实 DOM 山热区中心的儿童友好容差
 
 export default function startLevel3(game) {
   if (typeof window !== 'undefined') {
@@ -41,7 +27,6 @@ export default function startLevel3(game) {
     window.__forestPiano.currentLevelId = 3;
   }
 
-  // 不显示 Level 2 HUD, 显示普通 HUD 进度点
   const hudLevel2 = document.getElementById('hud-level2');
   if (hudLevel2) hudLevel2.style.display = 'none';
   const hudDots = document.querySelector('.hud__dots');
@@ -49,202 +34,149 @@ export default function startLevel3(game) {
   const btnReplay = document.getElementById('btn-replay');
   if (btnReplay) btnReplay.style.display = '';
 
-  // 渲染山谷场景 (SVG 背景 + 3 座音阶台 + 日落遮罩 + 粒子层)
   game.scene = new Level3Scene(game.stage);
-  // Game.js _startLevel1 也设了 game.bg (Background 实例). 避免冲突, Level3 不创建 bg.
-
-  // 鱼池: 全部 7 鱼, 但只有 Do Mi Sol 正确
-  game.fishPool = new FishPool(game.stage, NOTES_ALL);
+  // L3 不显示鱼身 Do/C4 标签，答案必须来自点击试听。
+  game.fishPool = new FishPool(game.stage, L3_NOTES, { fishDisplay: { showLabel: false } });
   game.fishPool.setDragEnabled(true);
   game.fishPool.intro();
 
-  // 引导气泡
-  game.say('柯尔文爷爷想听 Do Mi Sol 三部合唱! 把红 Do、黄 Mi、蓝 Sol 放到对应的山上~');
-
-  // 进度状态
-  const placed = new Set();          // 已放对的音 id
-  game._level3Total = 3;
+  const state = {
+    activeFishId: null,
+    auditioned: new Set(),
+    placed: new Set(),
+    resolving: false,
+  };
+  game._level3Total = L3_NOTES.length;
   game._level3Count = 0;
+  game.say('👂 先点一条小鱼，听听它唱的声音。听完再把它放到高低合适的山上~');
 
-  // 点鱼听声 (单击反馈)
-  game.fishPool.onTap = (fish) => {
-    try { game.audio.playNote(fish.dataset.pitch); } catch (_) {}
-    try { game.audio.hover(fish.dataset.id); } catch (_) {}
-    gsap.fromTo(fish, { scale: 1 }, { scale: 1.18, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.out' });
+  const noteOf = (id) => L3_NOTES.find((note) => note.id === id);
+  const resetToListen = (message) => {
+    state.activeFishId = null;
+    game.scene.setListening(false);
+    game.scene.setHoverTarget(null);
+    game.say(message || '再选一条小鱼，先听一听，再帮它找高低合适的山~');
   };
 
-  // 拖拽起点：立刻亮出对应山。不能依赖 FishPool 的 staff-slot 拖动回调，
-  // 因为本关没有 staff slot，那个回调的最近目标始终是 null。
+  // 点击是本关必经的第一步：选择并试听。重复点同一条可以重听。
+  game.fishPool.onTap = (fish) => {
+    const id = fish?.dataset?.id;
+    const note = noteOf(id);
+    if (!note || state.placed.has(id) || state.resolving) return;
+    state.activeFishId = id;
+    state.auditioned.add(id);
+    game.scene.setListening(true);
+    try { game.audio.playNote(note.pitch); } catch (_) {}
+    gsap.fromTo(fish, { scale: 1 }, { scale: 1.16, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.out' });
+    game.say('听到了吗？可以再点一次重听。想想它应该住在低一点，还是高一点的山~');
+  };
+
   game.fishPool.onDragStart = (fish) => {
     const id = fish?.dataset?.id;
+    if (!id || state.placed.has(id)) return;
     try { game.audio.hover(id); } catch (_) {}
-    try { game.scene.setDropTarget(TARGET_NOTES.has(id) ? id : null); } catch (_) {}
+    if (!state.auditioned.has(id)) {
+      game.scene.setListening(false);
+      game.say('先松开，点这条小鱼听一听，再帮它找山吧~');
+      return;
+    }
+    // 只亮所有山的中性接收态，不显示正确山。
+    game.scene.setListening(true);
   };
 
-  // v19.5: 拖动时直接高亮"这条鱼应该去的山"，而不是沿用 L1 的
-  // staff slot 逻辑。红 Do / 黄 Mi / 蓝 Sol 的山顶会变亮并弹出接收环；
-  // Re/Fa/La/Si 则不高亮，孩子立即知道它们不是本关要放的鱼。
-  game.fishPool.onDragMove = (fish) => {
+  // FishPool 传入松手/移动的真实 client 坐标；高亮的是当前靠近的山，不是答案。
+  game.fishPool.onDragMove = (fish, _staffSlot, point) => {
     const id = fish?.dataset?.id;
-    try { game.scene.setDropTarget(TARGET_NOTES.has(id) ? id : null); } catch (_) {}
+    if (!id || !state.auditioned.has(id) || !point) {
+      game.scene.setHoverTarget(null);
+      return;
+    }
+    const closest = game.scene.getClosestTarget(point);
+    game.scene.setHoverTarget(closest?.distance < TARGET_RADIUS ? closest.target : null);
   };
 
-  // 拖拽释放 — 判定
-  game.fishPool.onDrop = (fish, _slotEl, _accepted, dropPoint) => {
-    const id = fish.dataset.id;
-    try { game.scene.setDropTarget(null); } catch (_) {}
-    if (placed.has(id)) return;          // 已放对的鱼不应再触发
+  game.fishPool.onDrop = (fish, _staffSlot, _accepted, dropPoint) => {
+    const id = fish?.dataset?.id;
+    const note = noteOf(id);
+    if (!note || state.placed.has(id) || state.resolving) return;
+    game.scene.setHoverTarget(null);
 
-    // v19.5: 必须使用 FishPool 在"复位之前"记录的松手坐标。
-    // 旧版这里 getBoundingClientRect() 时，FishPool 已把鱼放回池里，
-    // 所有拖到山上的操作都会按鱼原位算距离，因而永远无法匹配。
-    let best = null, bestDist = Infinity;
-    const fx = dropPoint?.x;
-    const fy = dropPoint?.y;
-    if (!Number.isFinite(fx) || !Number.isFinite(fy)) return; // 防御兜底，不误判原位
-
-    // 找最近的 3 座山之一
-
-    if (game.scene && game.scene.background) {
-      for (const noteId of TARGET_NOTES) {
-        const sceneEl = game.scene.background.querySelector(`[data-note="${noteId}"]`);
-        if (!sceneEl) continue;
-        const r = sceneEl.getBoundingClientRect();
-        const px = r.left + r.width / 2;
-        const py = r.top + r.height / 2;
-        const d = Math.hypot(px - fx, py - fy);
-        if (d < bestDist) { bestDist = d; best = noteId; }
-      }
+    if (!state.auditioned.has(id)) {
+      resetToListen('👂 先点这条小鱼听一听，再来找高低合适的山~');
+      gsap.to(fish, { x: 0, y: 0, duration: 0.45, ease: 'elastic.out(1, 0.55)' });
+      return;
     }
 
-    const fishNote = NOTES_ALL.find((n) => n.id === id);
-    const inRange = best && bestDist < SNAP_RADIUS;
+    const closest = game.scene.getClosestTarget(dropPoint);
+    const target = closest?.target;
+    const targetId = target?.dataset?.note;
+    const inRange = Boolean(target && closest.distance < TARGET_RADIUS);
 
-    if (inRange && id === best) {
-      // 答对 — 鱼飞上山
-      placed.add(best);
-      game._level3Count = placed.size;
-      try { game.scene.markPlaced(best); } catch (_) {}
-      try { game.audio.correct(); } catch (_) {}
+    if (inRange && targetId === id) {
+      state.resolving = true;
+      state.placed.add(id);
+      game._level3Count = state.placed.size;
+      game.scene.markPlaced(id);
+      game.scene.setProgress(state.placed.size);
 
-      // 推进日落渐变 (progress-0 → progress-N)
-      try { game.scene.setProgress(placed.size); } catch (_) {}
-
-      const targetEl = game.scene.background.querySelector(`[data-note="${best}"]`);
-      const targetRect = targetEl.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
       const poolRect = game.fishPool.root.getBoundingClientRect();
       const targetX = targetRect.left - poolRect.left + targetRect.width / 2;
-      const targetY = targetRect.top - poolRect.top + targetRect.height / 2;
-
+      const targetY = targetRect.top - poolRect.top + targetRect.height * 0.58;
       const curLeft = parseFloat(fish.style.left) || 0;
       const curTop = parseFloat(fish.style.top) || 0;
       const dx = targetX - curLeft - fish.offsetWidth / 2;
       const dy = targetY - curTop - fish.offsetHeight / 2;
 
-      // 粒子绽放颜色 — 用该鱼的色
-      const bloomColor = (fishNote && fishNote.color) || '#ffd166';
-
+      try { game.audio.correct(); } catch (_) {}
       gsap.to(fish, {
         x: dx,
         y: dy,
-        scale: 0.85,
-        duration: 0.55,
+        scale: 0.78,
+        duration: 0.52,
         ease: 'back.out(1.7)',
         onComplete: () => {
-          // 锁定这条鱼
           try { game.fishPool.lockFish(id); } catch (_) {}
-          // 弹一次该音 + 反馈音
-          try { game.audio.playNote(fishNote.pitch); } catch (_) {}
-          try { game._floatScore(fx, fy, `${fishNote.solfege} ✓`); } catch (_) {}
-          // 在山脚触发金色粒子绽放 (DOM sparkle 圈)
-          try {
-            const tr = targetEl.getBoundingClientRect();
-            game.scene.bloomAt(tr.left + tr.width / 2, tr.bottom, bloomColor);
-          } catch (_) {}
-          // 鱼摇摆庆祝
-          gsap.to(fish, {
-            rotation: '+=8',
-            transformOrigin: '50% 50%',
-            duration: 0.12,
-            yoyo: true,
-            repeat: 5,
-            ease: 'sine.inOut',
-            onComplete: () => gsap.to(fish, { rotation: 0, duration: 0.2, ease: 'power2.out' })
-          });
-          // 鱼原地弹一下
-          gsap.fromTo(fish, { scale: 0.85 }, { scale: 1.05, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out' });
+          try { game.audio.playNote(note.pitch); } catch (_) {}
+          try { game.scene.bloomAt(targetRect.left + targetRect.width / 2, targetRect.top + targetRect.height / 2, note.color); } catch (_) {}
+          try { game._floatScore(targetRect.left + targetRect.width / 2, targetRect.top, `听对啦！${note.solfege}`); } catch (_) {}
 
-          // 推进引导
-          const msg = ENCOURAGE[placed.size - 1] + ' ' + placed.size + ' / 3';
-          game.say(msg);
-
-          // 通关判定
-          if (placed.size === 3) {
+          state.resolving = false;
+          if (state.placed.size === L3_NOTES.length) {
+            game.say('🌟 五个声音都找到山啦！一起唱：Do Re Mi Sol La~');
             setTimeout(() => {
               const stars = game._calcStars();
               try { game.progress.markLevelComplete(3, stars); } catch (_) {}
-              try { game.audio.playScale(['C4', 'E4', 'G4']); } catch (_) {}
+              try { game.audio.playScale(['C4', 'D4', 'E4', 'G4', 'A4']); } catch (_) {}
               try { game.showWinOverlay(stars, 3); } catch (_) {}
-            }, 700);
+            }, 850);
+            return;
           }
+          resetToListen(`✅ 听对啦，这是 ${note.solfege}！再选一条小鱼，先听后放~`);
         },
       });
-    } else {
-      // 错 — 鱼摇头 + 弹性回弹
-      game.wrongCount++;
-      try { game.audio.wrong(); } catch (_) {}
-      fish.classList.add('shake');
-      setTimeout(() => fish.classList.remove('shake'), 400);
-
-      const isDistractor = !TARGET_NOTES.has(id);
-      if (isDistractor) {
-        // Re / Fa / La / Si — 不是 Do Mi Sol 之一
-        // 强反馈: 3 座山一起抖动 + 把鱼"更狠"弹回去 (用强 elastic)
-        try { game.scene.shakePlatforms(); } catch (_) {}
-        game.say(`${fishNote.solfege} 不在 Do Mi Sol 里哦! 找红色 Do、黄色 Mi、蓝色 Sol 三座山~`);
-        // 加大反向距离: 让鱼弹得更远, 视觉上"被甩回去"
-        gsap.to(fish, {
-          x: 0,
-          y: 0,
-          duration: 0.9,
-          ease: 'elastic.out(1.2, 0.4)',
-        });
-        // 同时给鱼一个轻微旋转加重"被甩"感
-        gsap.fromTo(fish, { rotation: '+=15' }, { rotation: 0, duration: 0.4, ease: 'power2.out' });
-      } else if (inRange) {
-        // 正确的鱼, 但拖到了别的山
-        const correct = NOTES_ALL.find((n) => n.id === best);
-        game.say(`${fishNote.solfege} 应该去另一座山, 不是 ${correct ? correct.solfege : '那座'} 的位置~`);
-        gsap.to(fish, { x: 0, y: 0, duration: 0.55, ease: 'elastic.out(1, 0.5)' });
-      } else {
-        // 拖到空白
-        game.say(`${fishNote.solfege} 应该去山上相应的高度哦~`);
-        gsap.to(fish, { x: 0, y: 0, duration: 0.55, ease: 'elastic.out(1, 0.5)' });
-      }
+      return;
     }
+
+    game.wrongCount++;
+    try { game.audio.wrong(); } catch (_) {}
+    fish.classList.add('shake');
+    setTimeout(() => fish.classList.remove('shake'), 400);
+    // 过程性反馈：重播声音，不说出该去第几座山/什么唱名。
+    try { game.audio.playNote(note.pitch); } catch (_) {}
+    gsap.to(fish, { x: 0, y: 0, duration: 0.55, ease: 'elastic.out(1, 0.5)' });
+    state.activeFishId = id;
+    game.scene.setListening(true);
+    game.say('再听一次，慢慢比一比它的高低。它应该住在哪一座山呢？');
   };
 
-  // 返回 teardown
   return () => {
-    // 拆场景
-    if (game.scene) {
-      try { game.scene.teardown(); } catch (_) {}
-      game.scene = null;
-    }
-    // 拆鱼池 (清空 DOM 即可 — 下一关 start() 会重建 stage)
-    if (game.fishPool) {
-      try { game.fishPool.pool.innerHTML = ''; } catch (_) {}
-    }
-    // 复位 HUD (回到 Level 2 / Level 1 默认)
-    const hudLevel2 = document.getElementById('hud-level2');
-    if (hudLevel2) hudLevel2.style.display = '';
-    const hudDots = document.querySelector('.hud__dots');
-    if (hudDots) hudDots.style.display = '';
-    const btnReplay = document.getElementById('btn-replay');
-    if (btnReplay) btnReplay.style.display = '';
-    if (typeof window !== 'undefined') {
-      window.__forestPiano = window.__forestPiano || {};
-      window.__forestPiano.currentLevelId = null;
-    }
+    try { game.scene?.teardown(); } catch (_) {}
+    game.scene = null;
+    const hudLevel2El = document.getElementById('hud-level2');
+    if (hudLevel2El) hudLevel2El.style.display = '';
+    const dots = document.querySelector('.hud__dots');
+    if (dots) dots.style.display = '';
+    if (typeof window !== 'undefined') window.__forestPiano.currentLevelId = null;
   };
 }

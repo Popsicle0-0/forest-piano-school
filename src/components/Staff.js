@@ -11,10 +11,17 @@
  */
 import { SVG_NS } from '../utils/svg.js';
 
-const W = 1400;
+// v20: 五线谱不是装饰，它必须优先可读。旧 1400:260 的比例在手机
+// 横屏仅 102px 高的谱区会按 height 约束缩成约 550px 宽，白白浪费两侧空间。
+// 拉宽 viewBox 到 2200:260（接近手机横屏的可用比例），把 7 个 slot 均匀铺满，
+// 每个位置获得接近 100px 的真实间隔，儿童能看清也能对准。
+const W = 2200;
 const H = 260;
 const STAFF_TOP = 80;     // 5 线区域顶部 y(第 1 线)
 const STAFF_BOTTOM = 160; // 第 5 线 y
+const SLOT_START_X = 420;
+const SLOT_GAP = 280; // 7 个位置: 420..2100
+const CLEF_X = 190;
 const LINE_GAP = (STAFF_BOTTOM - STAFF_TOP) / 4; // 20
 const LEDGER_Y = STAFF_BOTTOM + LINE_GAP;        // 180, Do 第 1 加线
 const SPACE_BELOW_Y = (STAFF_BOTTOM + LEDGER_Y) / 2; // 170, Re 下加一间
@@ -57,14 +64,14 @@ export class Staff {
       )
       .join('');
 
-    // Do 的加线(虚线,长 60px,中心对齐 x=200)
-    const ledgerX = 200; // do 槽位的 x
+    // Do 的加线(虚线,长 60px,中心对齐第一个 slot)
+    const ledgerX = SLOT_START_X;
     const ledger = `<line class="staff__ledger" x1="${ledgerX - 30}" y1="${LEDGER_Y}" x2="${ledgerX + 30}" y2="${LEDGER_Y}"/>`;
 
     // 7 个 slot — 初始无文字标签,只画空心圆点
     const slots = this.notes
       .map((n, i) => {
-        const x = 200 + i * 130;
+        const x = SLOT_START_X + i * SLOT_GAP;
         const y = POSITIONS[n.id] ?? STAFF_TOP;
         return `
           <g class="staff-slot" data-id="${n.id}">
@@ -88,7 +95,7 @@ export class Staff {
       <svg class="staff" xmlns="${SVG_NS}" viewBox="0 0 ${W} ${H}"
            preserveAspectRatio="xMidYMid meet" aria-label="五线谱">
         <!-- 高音谱号 -->
-        <text class="staff__clef" x="105" y="120" dominant-baseline="middle">𝄞</text>
+        <text class="staff__clef" x="${CLEF_X}" y="120" dominant-baseline="middle">𝄞</text>
 
         <!-- 5 条主线 -->
         ${lines}

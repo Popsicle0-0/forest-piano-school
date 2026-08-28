@@ -1682,6 +1682,28 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 .level4-rhythm-guide__label { font-size: clamp(11px, 1.8vw, 15px); font-weight: 800; opacity: 0.8; }
 .level4-rhythm-guide__state { font-family: 'ZCOOL KuaiLe', sans-serif; font-size: clamp(18px, 3vw, 28px); font-weight: 900; line-height: 1.1; }
 .level4-rhythm-guide__count { margin-top: 2px; font-size: clamp(10px, 1.5vw, 13px); font-weight: 800; opacity: 0.7; }
+/* 教完后状态卡缩到右上角，不再遮挡手机上的河流/鼓/泡泡。 */
+.level4-rhythm-guide--compact {
+  left: auto;
+  right: clamp(8px, 2vw, 20px);
+  top: clamp(8px, 2vh, 16px);
+  transform: none;
+  min-width: 0;
+  max-width: 94px;
+  padding: 5px 8px;
+  border-width: 2px;
+  opacity: 0.82;
+}
+.level4-rhythm-guide--compact .level4-rhythm-guide__state { font-size: 18px; }
+.level4-rhythm-guide--compact .level4-rhythm-guide__count { display: none; }
+.level4-rhythm-guide--compact[data-state="hit"] { transform: scale(1.12); }
+.level4-rhythm-guide[data-state="teach"] { background: rgba(232, 242, 255, 0.97); border-color: #5fa8b5; color: #264653; }
+@media (max-height: 520px) {
+  .level4-rhythm-guide { top: 4px; padding: 4px 9px; min-width: min(210px, 58%); }
+  .level4-rhythm-guide__label { font-size: 10px; }
+  .level4-rhythm-guide__state { font-size: 17px; }
+  .level4-rhythm-guide__count { display: none; }
+}
 .level4-rhythm-guide[data-state="hit"] {
   background: rgba(255, 238, 222, 0.98); border-color: #ff5252; color: #b21f35;
   transform: translateX(-50%) scale(1.1); animation: level4GuideHit 310ms ease-out infinite alternate;
@@ -1806,27 +1828,9 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   100% { transform: translate(-50%, -200%) scale(1.0); opacity: 0; }
 }
 
-/* === v17.8: Level 3 五声音阶山谷 === */
-/* v19.5: 对应鱼被拖起时，目标山给出稳定而明确的"放这里"信号；
-   答对后保留绿色完成环，避免只靠一闪而过的粒子让儿童不知是否匹配。 */
-.level3-platform.is-drop-target {
-  filter: drop-shadow(0 0 12px rgba(255, 235, 120, 0.95));
-  animation: level3DropTarget 620ms ease-in-out infinite;
-}
-.level3-platform.is-drop-target .level3-platform-top {
-  stroke: #fff8a8;
-  stroke-width: 4px;
-}
-.level3-platform.is-placed .level3-platform-top {
-  stroke: #06d6a0;
-  stroke-width: 4px;
-  filter: drop-shadow(0 0 8px rgba(6, 214, 160, 0.95));
-}
-.level3-platform.is-placed .level3-platform-label { fill: #fff; font-size: 24px; }
-@keyframes level3DropTarget {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-5px) scale(1.06); }
-}
+/* === Level 3 五声音阶山谷（v20 探索教学版） ===
+   山景 SVG 只做装饰；真实可投放目标是 .level3-targets DOM 网格。
+   这样竖屏不裁左右、每座山都有 >=44px 可用热区，并且视觉绝不泄露音名。 */
 .level3-background {
   position: absolute;
   inset: 0;
@@ -1889,41 +1893,68 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   0%, 100% { opacity: 0.7; }
   50%      { opacity: 0.85; }
 }
-.level3-platform-base {
-  fill: rgba(0, 0, 0, 0.25);
+/* 五座互动山：无唱名、无鱼色对应，只有高度与不同自然材质。 */
+.level3-targets {
+  position: absolute;
+  inset: 15% 3% 34%;
+  /* 背景 z1 之上、FishPool z3 之下：山可见，但拖着的鱼永远在山前面。 */
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(44px, 1fr));
+  gap: clamp(4px, 1.5vw, 16px);
+  align-items: end;
+  pointer-events: none;
 }
-.level3-platform-body {
-  fill: #8b5a2b;
-  stroke: rgba(0, 0, 0, 0.3);
-  stroke-width: 2;
+.level3-target {
+  position: relative;
+  height: var(--mountain-h);
+  min-height: 44px;
+  align-self: end;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  pointer-events: none;
 }
-.level3-platform-top {
-  fill: #5d8a4b;
-  stroke: rgba(0, 0, 0, 0.3);
-  stroke-width: 1.5;
+.level3-target__mountain {
+  position: relative;
+  width: min(100%, 104px);
+  height: 100%;
+  min-height: 44px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: linear-gradient(120deg, #6f8e60, #3e604a 68%, #29443d);
+  border-bottom: 4px solid rgba(33, 65, 52, 0.85);
+  filter: drop-shadow(0 5px 4px rgba(25, 45, 38, 0.28));
 }
-.level3-platform[data-note="mi"] .level3-platform-body { fill: #6b9a5b; }
-.level3-platform[data-note="sol"] .level3-platform-body { fill: #4d6f3f; }
-.level3-platform-label {
-  font-family: 'ZCOOL KuaiLe', sans-serif;
-  font-size: 28px;
-  font-weight: 900;
-  fill: white;
-  paint-order: stroke;
-  stroke: rgba(0, 0, 0, 0.6);
-  stroke-width: 3;
+.level3-target--stone .level3-target__mountain { background: linear-gradient(120deg, #9a917c, #655f55 68%, #45433f); }
+.level3-target--fern .level3-target__mountain { background: linear-gradient(120deg, #77985e, #416f45 68%, #315440); }
+.level3-target--cloud .level3-target__mountain { background: linear-gradient(120deg, #718ba2, #4e6e85 68%, #3b5569); }
+.level3-target--star .level3-target__mountain { background: linear-gradient(120deg, #87789d, #5c5279 68%, #403d63); }
+.level3-target__peak {
+  position: absolute;
+  top: 6%; left: 50%; transform: translateX(-50%);
+  width: 24%; height: 15%; border-radius: 50%;
+  background: rgba(255,255,245,0.85);
 }
-.level3-platform {
-  animation: platformBreath 3s ease-in-out infinite;
-  transform-origin: center;
-  transform-box: fill-box;
+.level3-target__halo {
+  position: absolute;
+  inset: -12px;
+  border: 3px dashed rgba(255,255,255,0.5);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 150ms ease, transform 150ms ease, border-color 150ms ease;
 }
-.level3-platform[data-note="do"]  { animation-delay: 0s; }
-.level3-platform[data-note="mi"]  { animation-delay: 0.4s; }
-.level3-platform[data-note="sol"] { animation-delay: 0.8s; }
-@keyframes platformBreath {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
+.level3-targets.is-listening .level3-target__halo { opacity: 0.48; transform: scale(1); }
+.level3-target.is-hover-target .level3-target__halo {
+  opacity: 1; transform: scale(1.1); border-color: #fff3a8;
+  box-shadow: 0 0 16px rgba(255, 235, 120, 0.95);
+}
+.level3-target.is-hover-target .level3-target__mountain { filter: brightness(1.18) drop-shadow(0 0 10px rgba(255,235,120,0.8)); }
+.level3-target.is-placed .level3-target__halo { opacity: 1; border-style: solid; border-color: #06d6a0; transform: scale(1.1); }
+.level3-target.is-placed .level3-target__mountain { filter: brightness(1.13) drop-shadow(0 0 11px rgba(6,214,160,0.9)); }
+@media (orientation: portrait) {
+  .level3-targets { inset: 18% 2% 38%; gap: 3px; }
+  .level3-target { min-width: 44px; }
 }
 .level3-hand-text {
   font-size: 64px;
@@ -6473,8 +6504,10 @@ body.large-text .level-map-tile__desc { font-size: 13px !important; }
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 0 4px;
+  padding: 0;
 }
+/* 覆盖通用 .stage__kb-area 的 20px 底部空白，stack 键盘必须用完整高度。 */
+.stage--stack .keyboard-area.stage__kb-area { padding-bottom: 0; }
 .stage--stack svg.keyboard {
   width: 100%;
   height: 100%;
@@ -6482,6 +6515,36 @@ body.large-text .level-map-tile__desc { font-size: 13px !important; }
   max-height: 100%;
   min-height: 0;
   display: block;
+}
+/* v20: 键形可横向填满，但文字绝不能跟随 SVG 非等比变形。
+   标签是叠在白键下部的普通 DOM 网格，字形始终保持自然比例。 */
+.keyboard-area { position: relative; }
+.keyboard-area .key__label--svg { display: none; }
+.keyboard-labels {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--key-count, 7), 1fr);
+  align-items: end;
+  pointer-events: none;
+  z-index: 2;
+}
+.keyboard-label {
+  min-width: 0;
+  padding-bottom: clamp(5px, 1.2vh, 14px);
+  text-align: center;
+  color: #3d405b;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+  line-height: 1;
+}
+.keyboard-label b { display: block; font-size: clamp(13px, 2.7vh, 19px); font-family: 'ZCOOL KuaiLe', sans-serif; }
+.keyboard-label small { display: block; margin-top: 2px; font-size: clamp(10px, 1.8vh, 14px); color: #6b7280; }
+
+/* 横屏舞台尽量吃满 #app 的剩余宽度；旧 8px×2 padding 让视觉始终有白边。 */
+@media (orientation: landscape) {
+  .stage { padding-left: 0; padding-right: 0; }
+  .stage--stack .staff-wrap { padding-left: clamp(8px, 2vw, 28px); padding-right: clamp(8px, 2vw, 28px); }
+  .stage--stack .keyboard-area { padding-left: 0; padding-right: 0; }
 }
 
 /* 竖屏(手机)竖直空间多: 加大鱼池与五线谱比重, 键盘略压 */
