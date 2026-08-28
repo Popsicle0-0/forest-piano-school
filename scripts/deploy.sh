@@ -196,6 +196,6 @@ echo "  main:     $(git log --oneline -1 | sed 's/^/  /')"
 echo "  源码版本: ${APP_V}"
 echo "  GitHub:   https://popsicle0-0.github.io/forest-piano-school/"
 if [ -f "$OSS_SYNC" ]; then
-  echo "  OSS:      http://piano.hrc.ac.cn (HTTPS/CDN 配好后改用 https://)"
+  echo "  OSS:      https://piano.hrc.ac.cn"
 fi
 warn "iPhone/iPad 上如果看到的还是旧版: 从主屏幕删掉 app 重新添加 (iOS PWA 缓存最顽固)"

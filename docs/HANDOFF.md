@@ -1,21 +1,32 @@
 # 🎹 森林钢琴学校 — 项目交接文档
 
-> **新接手必读**:读完本文档,你应该能 100% 继续这个项目。
+> **新接手必读**:读完本文档及其指定的运行手册,应能无断层继续项目。
 >
-> **最后更新**: 2026-08-27 · 当前版本 **v19.0**（布局体系完全重写,详见 `docs/FIXLOG-v19.0.md` 与 `docs/LAYOUT-v19.md`）
+> **最后更新**: 2026-08-28 · 当前正式版本 **v19.4** · main `eaaf6d2` 后的 OSS 自动部署工具已接入
 >
-> ⚠️ 本文档部分章节(关卡实现表/组件 API)仍描述 v18.7 状态,细节以代码为准;
-> 布局相关的一切旧说法(JS 注入像素/强制横屏)已在 v19 废除——**布局唯一规范是 `docs/LAYOUT-v19.md`**。
+> ## 先读这三份“当前真相源”
+> 1. **部署 / 域名 / OSS / Cloudflare / 凭证安全** → `docs/DEPLOYMENT.md`
+> 2. **布局唯一规范（CSS-only，v19 起）** → `docs/LAYOUT-v19.md`
+> 3. **v19.0–v19.4 的真实修复链路与真机回归结果** → `docs/FIXLOG-v19.0.md`
+>
+> ⚠️ 本文档历史章节（特别是 v18.7 版本标记、旧 iOS JS 注入布局、旧手工部署流程）仅供背景追溯，可能过时；发生冲突时一律以**代码 + 上述三份当前文档**为准。布局相关的 `applyPhoneLayout` / `applyTabletLayout` / 强制横屏规则已彻底废除。
 
 ---
 
 ## 0. 项目一句话
 
-面向 5-10 岁儿童的**钢琴启蒙**互动网页(纯前端 + Vite + GitHub Pages 部署,iPad/iPhone 优先)。
+面向 5-10 岁儿童的**钢琴启蒙**互动网页（纯前端 + Vite，iPad/iPhone 优先）。
 
-**v18.7 已远超最初的"单关卡小鱼拖拽"**:完整 16 关钢琴启蒙路径 + 关卡地图 + 主题切换 + 自由演奏沙盒 + 12 首歌曲库 + 成就墙 + 排行榜 + 分享 + 每日登录 streak + 教程 + 键盘快捷键 + 音频波形可视化 + PWA manifest。
+项目已发展为完整 **16 关**钢琴启蒙路径 + 关卡地图 + 主题切换 + 自由演奏沙盒 + 12 首歌曲库 + 成就墙 + 个人进度总览 + 分享 + 每日 streak + 教程 + 键盘快捷键 + PWA manifest。
 
-**线上地址**: https://popsicle0-0.github.io/forest-piano-school/
+**线上地址**：
+
+| 用途 | 地址 |
+|---|---|
+| **正式站（优先给用户/真机/PWA）** | https://piano.hrc.ac.cn |
+| GitHub Pages 备用站 | https://popsicle0-0.github.io/forest-piano-school/ |
+
+> v19.2 起，Waveform canvas 已默认关闭（它曾在横屏形成一个遮挡玩法的半透明矩形），不要把它当作常驻功能。详情在 `FIXLOG-v19.0.md`。
 
 ---
 
@@ -29,28 +40,37 @@
 | **主分支** | `main` (源代码) |
 | **GitHub Pages URL** | https://popsicle0-0.github.io/forest-piano-school/ |
 | **Pages 设置** | 仓库 Settings → Pages → Source: gh-pages branch / root |
-| **GitHub Token** | 在 `docs/CREDENTIALS.md` (gitignored, 不进 git), 30 天期限 |
+| **GitHub Token** | `docs/CREDENTIALS.md`（gitignored，不进 git） |
+| **正式静态站** | Alibaba Cloud OSS Bucket `forest-piano-kino`（中国香港） |
+| **正式自定义域名** | `piano.hrc.ac.cn`（Cloudflare DNS/HTTPS） |
+| **邮件边界** | Cloudflare Email Routing 使用根域名邮件记录；仅维护 `piano` CNAME，严禁触碰 MX/TXT/Nameserver |
+| **OSS 部署凭证** | 同在 `docs/CREDENTIALS.md`；专用 RAM 用户、只允许操作该 Bucket，绝不能提交/发送 |
 
-**用户首次部署时已做**:
-1. 浏览器创建仓库 `forest-piano-school` (Public)
-2. 生成 Personal Access Token (PAT),只勾 `repo` 权限
-3. 之后每次部署用 HTTPS + token 推 `gh-pages`
+**当前部署事实**：
+1. `main` 是唯一源码分支；
+2. `gh-pages` 是由部署脚本强推的备用静态站；
+3. OSS 是正式站的源站，Cloudflare 为 `piano.hrc.ac.cn` 提供 DNS 和 HTTPS；
+4. 唯一日常发布入口是 `bash scripts/deploy.sh --yes "vX.Y: 描述"`，它会构建、推 main、更新 gh-pages、同步 OSS；
+5. 完整配置与新电脑交接步骤在 `docs/DEPLOYMENT.md`。不要再按本文件后文的旧手工 `.gitignore.bak` / orphan 命令操作。
 
 ---
 
 ## 2. 当前线上版本 + 版本演进时间线
 
-### 2.1 当前版本: **v18.7**
+### 2.1 当前版本: **v19.4**
 
-| 提交 | 标题 |
+| 项 | 当前值 |
 |---|---|
-| `main:48fcf09` | v18.7: Leaderboard + Progress map (Continue + mechanic icons) + SongLibrary 12 首歌 + Pip mascot 互动 |
-| `gh-pages:54c2424` | deploy: v18.7 |
+| main 最新部署工具提交 | `eaaf6d2` — 自动同步阿里云 OSS |
+| 最近功能版本提交 | `5ee61d0` — L1–L15 依次进入下一关，L16 才显示真正课程完成 |
+| 正式站发布方式 | `scripts/deploy.sh` → OSS + Cloudflare 自定义域名 |
+| 备用站发布方式 | 同一脚本强推 `gh-pages` |
 
-- 版本号同时在两处维护(双重防缓存):
-  - `src/main.js:21` 的 `APP_VERSION = 'v18.7'`
-  - `index.html:93` 的 `<script src="/src/main.js?v=18.7">`
-- 版本号渲染:左上角星星 ⭐⭐⭐ 旁边有个灰底 `v18.7` 标签,用户一眼可看当前版本。
+- 版本号必须同步维护两处（双重防 iOS PWA 缓存）：
+  - `src/main.js` 的 `APP_VERSION = 'v19.4'`
+  - `index.html` 的 `<script src="/src/main.js?v=19.4">`
+- 版本号渲染：HUD 左侧灰底标签显示当前版本。
+- v19.1–v19.3 真机热修复已落实：L1 直入/对位、L2 点选、L3 鱼可见性、短横屏布局、Waveform 隐藏等，详见 `FIXLOG-v19.0.md`。
 
 ### 2.2 版本演进 (v15 → v18.7 一图速读)
 

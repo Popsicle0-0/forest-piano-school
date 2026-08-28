@@ -12,7 +12,7 @@
 ## 两类舞台模式（Game.start 已自动切换）
 | 模式 | 适用 | stage 类名 |
 |---|---|---|
-| 三段栈 | L1、L2（Staff+FishPool+Keyboard 组合） | `#stage.stage--stack`：flex column，五线谱(order:1, flex5)/鱼池(order:2, flex6, min-height:128px)/键盘(order:3, clamp(92px,24%,170px))。规则在 style.css 文件末尾 STACK MODE 章节 |
+| 三段栈 | L1、L2（Staff+FishPool+Keyboard 组合） | `#stage.stage--stack`：flex column。常态：五线谱(order:1, flex5, min84)/鱼池(order:2, flex6, min128)/键盘(order:3, clamp(92px,24%,170px))；**≤520px 高短横屏**由救生艇媒体块重排为五线谱 min102 / 鱼池 min92 / 键盘 min76，优先确保 L1 对位可见。规则在 style.css 文件末尾 STACK MODE/短视口救生艇章节 |
 | 中性画布 | L3-L16（各场景自管） | `#stage` 无附加类：position:relative 的确定尺寸盒子 |
 
 ## 关卡层写法约定
@@ -26,10 +26,13 @@
    "300ms 内同一交互元素的第二次触碰"，跨元素快连不受影响 —— 不需要在
    关卡里再加自己的防抖来绕它。
 5. 鱼池类玩法直接复用 FishPool（含 v19 参数化鱼体尺寸与转屏重散布），
-   不要复制它的逻辑。
+   不要复制它的逻辑。**L1 调参要区分触控 wrapper 与视觉 inner**：v19.3 的
+   wrapper 为 `68×52`、视觉 inner 缩为 78%、锁定后缩为 45%、最小鱼间距 72px；
+   不要为了"更好抓"把视觉鱼重新放大，否则会遮挡五线谱邻位。
 6. `viewBox="0 0 800 500"` + `slice` 的场景 SVG 允许保留（装饰性裁切可接受），
-   但**可交互目标的摆放位置必须来自容器实测矩形**，不能假设某个百分比映射后
-   恰好在屏内。
+   但 L1 的 Staff/PianoKeyboard 不是装饰：必须维持 `meet`（谱）与横向撑满
+   `preserveAspectRatio="none"`（键盘）的当前策略。所有**可交互目标**的摆放位置
+   必须来自容器实测矩形，不能假设某个百分比映射后恰好在屏内。
 
 ## 回归清单（每组适配完成后自查）
 - [ ] iPhone 17 Pro 横屏 874×402：内容完整可见（短屏救生艇媒体块已保证三段最小和 ~252px < 可用 ~285px）、HUD 图标钮 ≥36px / 主要玩法热区 ≥44px、无横向滚动条（HUD 内部滚动除外）

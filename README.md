@@ -1,8 +1,9 @@
 # 🎹 森林钢琴学校 / Forest Piano School
 
-> 面向 5-10 岁儿童的**钢琴启蒙**互动网页 — 纯前端,GitHub Pages 部署
+> 面向 5-10 岁儿童的**钢琴启蒙**互动网页 — 纯前端 Vite 应用，iPad/iPhone 优先。
 
-[![demo](https://img.shields.io/badge/demo-live-brightgreen)](https://popsicle0-0.github.io/forest-piano-school/)
+[![正式站](https://img.shields.io/badge/正式站-piano.hrc.ac.cn-brightgreen)](https://piano.hrc.ac.cn)
+[![备用站](https://img.shields.io/badge/GitHub%20Pages-备用-blue)](https://popsicle0-0.github.io/forest-piano-school/)
 
 ## 项目介绍
 
@@ -32,7 +33,20 @@ npm run preview  # 预览构建产物
 
 ## 部署
 
-`npm run build` 产物在 `dist/`,部署到 GitHub Pages。
+正式站：**https://piano.hrc.ac.cn**
+
+- 源码与备用站：GitHub `main` / `gh-pages`
+- 正式静态文件：阿里云 OSS（中国香港）
+- DNS 与 HTTPS：Cloudflare
+
+日常发布由维护者执行一条命令：
+
+```bash
+bash scripts/deploy.sh --yes "vX.Y: 改动摘要"
+```
+
+它会构建 `dist/`、更新 GitHub Pages 备用站，并自动同步到 OSS 正式站。
+完整的域名、凭证安全、新电脑接手和故障排查见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 
 ## 关卡
 
