@@ -4171,6 +4171,9 @@ button:active:not(:disabled),
 .level10-replay:active { transform: translateY(2px); }
 
 /* v18.6 polish: 八度区外的"高音 / 低音"提示标签 (always visible) */
+/* v20.3: .level10-stage > * 的 pointer-events:auto 特异度更高；必须用
+   直接子选择器覆盖，否则这个全屏提示层吞掉高/低选择按钮的所有点击。 */
+.level10-stage > .level10-hint-labels { pointer-events: none; }
 .level10-hint-labels {
   position: absolute;
   inset: 0;
