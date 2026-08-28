@@ -112,12 +112,24 @@ def main() -> int:
         }
         bucket.put_object_from_file(key, str(path), headers=headers)
 
+    # Stale hash assets are safe to delete, but cleanup must never make a
+    # successful upload look like a failed release.  CDNs/OSS occasionally
+    # return transient 5xx responses to DELETE; the current index.html no
+    # longer references these files, so defer cleanup to the next deploy.
+    delete_failures = 0
     for key in deletes:
         print(f"  {'would delete' if args.dry_run else 'delete'} {key}")
         if not args.dry_run:
-            bucket.delete_object(key)
+            try:
+                bucket.delete_object(key)
+            except Exception as error:
+                delete_failures += 1
+                print(f"    warning: stale asset cleanup deferred for {key}: {error}", file=sys.stderr)
 
-    print("OSS sync complete." if not args.dry_run else "OSS dry-run complete.")
+    if delete_failures:
+        print(f"OSS sync complete: current files uploaded; {delete_failures} stale cleanup operation(s) deferred.")
+    else:
+        print("OSS sync complete." if not args.dry_run else "OSS dry-run complete.")
     return 0
 
 
