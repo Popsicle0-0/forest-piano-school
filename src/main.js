@@ -18,10 +18,12 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v19.4';
+const APP_VERSION = 'v19.5';
 
 // 全局单例(便于控制台调试)
-window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };
+// 保留 LevelMap / Game 模块初始化时挂上的调试元数据，不能整体覆盖。
+window.__forestPiano = window.__forestPiano || {};
+Object.assign(window.__forestPiano, { Game, Audio, Progress, version: APP_VERSION });
 
 // 等 DOM 完整后启动
 if (document.readyState === 'loading') {
@@ -83,10 +85,11 @@ function boot() {
   const levelBadge = document.createElement('span');
   levelBadge.className = 'level-badge';
   levelBadge.id = 'level-badge';
-  levelBadge.title = '点击返回关卡地图';
+  levelBadge.title = '回关卡地图';
   levelBadge.setAttribute('role', 'button');
-  levelBadge.setAttribute('aria-label', '当前关卡 - 点击返回地图');
-  levelBadge.textContent = '🐟 第 1 关 · 小鱼跳进五线谱';
+  levelBadge.setAttribute('aria-label', '回关卡地图');
+  // v19.5: 关卡主题 emoji 不是导航语义；地图图标+可见文字对儿童更直接。
+  levelBadge.textContent = '🗺️ 回地图 · 第 1 关';
   const hudLeftForBadge = document.querySelector('.hud__left');
   if (hudLeftForBadge) hudLeftForBadge.insertBefore(levelBadge, hudLeftForBadge.firstChild);
   // 点击徽章 → 回关卡地图 (解决"不知道怎么玩别的关卡")

@@ -90,6 +90,17 @@ export class Level3Scene {
     this.background = bg;
   }
 
+  /** v19.5: 拖动时高亮某座山，给孩子明确"放这里"的可见提示。 */
+  setDropTarget(noteId) {
+    if (!this.background) return;
+    this.background.querySelectorAll('.level3-platform.is-drop-target').forEach((el) => {
+      el.classList.remove('is-drop-target');
+    });
+    if (!noteId) return;
+    const target = this.background.querySelector(`[data-note="${noteId}"]`);
+    if (target) target.classList.add('is-drop-target');
+  }
+
   /** 设置当前进度 (0/1/2/3), 触发日落渐变过渡 */
   setProgress(count) {
     if (!this.background) return;
@@ -123,6 +134,16 @@ export class Level3Scene {
       layer.appendChild(sp);
       // 移除
       setTimeout(() => { try { sp.remove(); } catch (_) {} }, 1100);
+    }
+  }
+
+  /** 标记一座山已收下对应鱼，持久展示完成反馈。 */
+  markPlaced(noteId) {
+    if (!this.background) return;
+    const target = this.background.querySelector(`[data-note="${noteId}"]`);
+    if (target) {
+      target.classList.remove('is-drop-target');
+      target.classList.add('is-placed');
     }
   }
 

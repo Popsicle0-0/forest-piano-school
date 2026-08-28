@@ -603,6 +603,11 @@ export class FishPool {
       const accepted = !!nearest
         && nearestDist < SNAP_RADIUS
         && nearest.dataset.id === fish.note.id;
+      // v19.5: 通知自定义落点关卡(L3/L7 等)时必须携带"松手瞬间"
+      // 的真实 client 坐标。下面会把鱼复位到鱼池，再回调 onDrop；旧接口
+      // 只传 fish DOM，Level3 再取 rect 时拿到的已是原位，导致拖到山上
+      // 永远匹配不上。L1 忽略第4参数，保持兼容。
+      const dropPoint = { x: fx, y: fy };
 
       // ---- 复位 (为 handleWrong 的 gsap.to({x:0,y:0}) 做准备) ----
       el.classList.remove('dragging');
@@ -629,7 +634,7 @@ export class FishPool {
       }
 
       if (typeof this.onDrop === 'function') {
-        try { this.onDrop(el, nearest, accepted); } catch (err) { console.warn(err); }
+        try { this.onDrop(el, nearest, accepted, dropPoint); } catch (err) { console.warn(err); }
       }
     };
 

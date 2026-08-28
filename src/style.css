@@ -1659,6 +1659,38 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   transform-origin: center;
 }
 
+/* v19.5: L4 明确节奏说明卡。它用文字、色彩和节拍计数三重反馈：
+   黄色=等、红色=现在敲、绿色=敲对、粉色=漏/错，儿童无需猜动画含义。 */
+.level4-rhythm-guide {
+  position: absolute;
+  top: clamp(8px, 3vh, 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  min-width: min(280px, 72%);
+  max-width: 86%;
+  padding: 7px 14px;
+  border-radius: 16px;
+  color: #3d405b;
+  background: rgba(255, 248, 236, 0.94);
+  border: 3px solid #ffd166;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.24);
+  text-align: center;
+  pointer-events: none;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.level4-rhythm-guide__label { font-size: clamp(11px, 1.8vw, 15px); font-weight: 800; opacity: 0.8; }
+.level4-rhythm-guide__state { font-family: 'ZCOOL KuaiLe', sans-serif; font-size: clamp(18px, 3vw, 28px); font-weight: 900; line-height: 1.1; }
+.level4-rhythm-guide__count { margin-top: 2px; font-size: clamp(10px, 1.5vw, 13px); font-weight: 800; opacity: 0.7; }
+.level4-rhythm-guide[data-state="hit"] {
+  background: rgba(255, 238, 222, 0.98); border-color: #ff5252; color: #b21f35;
+  transform: translateX(-50%) scale(1.1); animation: level4GuideHit 310ms ease-out infinite alternate;
+}
+.level4-rhythm-guide[data-state="good"] { background: rgba(221, 255, 238, 0.98); border-color: #06d6a0; color: #087f60; }
+.level4-rhythm-guide[data-state="bad"],
+.level4-rhythm-guide[data-state="miss"] { background: rgba(255, 229, 234, 0.98); border-color: #ff4d6d; color: #b21f35; }
+@keyframes level4GuideHit { from { box-shadow: 0 0 0 rgba(255, 82, 82, 0); } to { box-shadow: 0 0 22px rgba(255, 82, 82, 0.85); } }
+
 /* 节奏泡泡 (流过屏幕的节拍球) */
 .level4-bubbles-container {
   position: absolute;
@@ -1775,6 +1807,26 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 }
 
 /* === v17.8: Level 3 五声音阶山谷 === */
+/* v19.5: 对应鱼被拖起时，目标山给出稳定而明确的"放这里"信号；
+   答对后保留绿色完成环，避免只靠一闪而过的粒子让儿童不知是否匹配。 */
+.level3-platform.is-drop-target {
+  filter: drop-shadow(0 0 12px rgba(255, 235, 120, 0.95));
+  animation: level3DropTarget 620ms ease-in-out infinite;
+}
+.level3-platform.is-drop-target .level3-platform-top {
+  stroke: #fff8a8;
+  stroke-width: 4px;
+}
+.level3-platform.is-placed .level3-platform-top {
+  stroke: #06d6a0;
+  stroke-width: 4px;
+  filter: drop-shadow(0 0 8px rgba(6, 214, 160, 0.95));
+}
+.level3-platform.is-placed .level3-platform-label { fill: #fff; font-size: 24px; }
+@keyframes level3DropTarget {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.06); }
+}
 .level3-background {
   position: absolute;
   inset: 0;

@@ -28,8 +28,10 @@ const NOTES_ALL = [
 // 3 座山谷平台对应的音
 const TARGET_NOTES = new Set(['do', 'mi', 'sol']);
 
-// 拖拽容差 (px) — 山间距较大, 100 足够
-const SNAP_RADIUS = 130;
+// v19.5: 山的平台视觉宽约 120px，横竖屏 SVG 缩放后 130px 容差会
+// 让孩子必须精确点到很窄的台面；放宽到 170px 让孩子落在有色平台附近即可，
+// 但仍通过 "鱼 id === 山 id" 保证不会错误匹配。
+const SNAP_RADIUS = 170;
 
 const ENCOURAGE = ['真棒!', '太厉害了~', '不错哟!'];
 
@@ -71,26 +73,37 @@ export default function startLevel3(game) {
     gsap.fromTo(fish, { scale: 1 }, { scale: 1.18, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.out' });
   };
 
-  // 拖拽起点 (锁定已有鱼不动 + 提示音)
+  // 拖拽起点：立刻亮出对应山。不能依赖 FishPool 的 staff-slot 拖动回调，
+  // 因为本关没有 staff slot，那个回调的最近目标始终是 null。
   game.fishPool.onDragStart = (fish) => {
-    try { game.audio.hover(fish.dataset.id); } catch (_) {}
+    const id = fish?.dataset?.id;
+    try { game.audio.hover(id); } catch (_) {}
+    try { game.scene.setDropTarget(TARGET_NOTES.has(id) ? id : null); } catch (_) {}
   };
 
-  // 拖拽中 — 显示最近山的提示
-  game.fishPool.onDragMove = (_fish, _slot) => {
-    // 暂不实现 hover hint (避免与 Level 1 staff slot 冲突)
+  // v19.5: 拖动时直接高亮"这条鱼应该去的山"，而不是沿用 L1 的
+  // staff slot 逻辑。红 Do / 黄 Mi / 蓝 Sol 的山顶会变亮并弹出接收环；
+  // Re/Fa/La/Si 则不高亮，孩子立即知道它们不是本关要放的鱼。
+  game.fishPool.onDragMove = (fish) => {
+    const id = fish?.dataset?.id;
+    try { game.scene.setDropTarget(TARGET_NOTES.has(id) ? id : null); } catch (_) {}
   };
 
   // 拖拽释放 — 判定
-  game.fishPool.onDrop = (fish, _slotEl, _accepted) => {
+  game.fishPool.onDrop = (fish, _slotEl, _accepted, dropPoint) => {
     const id = fish.dataset.id;
+    try { game.scene.setDropTarget(null); } catch (_) {}
     if (placed.has(id)) return;          // 已放对的鱼不应再触发
 
-    // 找最近的 3 座山之一
+    // v19.5: 必须使用 FishPool 在"复位之前"记录的松手坐标。
+    // 旧版这里 getBoundingClientRect() 时，FishPool 已把鱼放回池里，
+    // 所有拖到山上的操作都会按鱼原位算距离，因而永远无法匹配。
     let best = null, bestDist = Infinity;
-    const fishCenter = fish.getBoundingClientRect();
-    const fx = fishCenter.left + fishCenter.width / 2;
-    const fy = fishCenter.top + fishCenter.height / 2;
+    const fx = dropPoint?.x;
+    const fy = dropPoint?.y;
+    if (!Number.isFinite(fx) || !Number.isFinite(fy)) return; // 防御兜底，不误判原位
+
+    // 找最近的 3 座山之一
 
     if (game.scene && game.scene.background) {
       for (const noteId of TARGET_NOTES) {
@@ -111,6 +124,7 @@ export default function startLevel3(game) {
       // 答对 — 鱼飞上山
       placed.add(best);
       game._level3Count = placed.size;
+      try { game.scene.markPlaced(best); } catch (_) {}
       try { game.audio.correct(); } catch (_) {}
 
       // 推进日落渐变 (progress-0 → progress-N)

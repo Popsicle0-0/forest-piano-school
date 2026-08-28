@@ -41,7 +41,7 @@ if (typeof window !== 'undefined') {
 }
 import { Background } from '../components/Background.js';
 import { Pip } from '../components/Pip.js';
-import { LevelMap } from '../components/LevelMap.js';
+import { LevelMap, LEVEL_META } from '../components/LevelMap.js';
 import particles from '../components/Particles.js';
 import { gsap } from 'gsap';
 
@@ -244,9 +244,11 @@ export class Game {
     try {
       const lb = document.getElementById('level-badge');
       if (!lb) return;
-      const meta = window.__forestPiano?.LEVEL_META?.find((m) => m.id === levelId);
+      // v19.5: 静态关卡元数据直接 import，不再走 window 全局对象。
+      // main.js 曾整体覆盖 __forestPiano，造成徽章永远停在硬编码的第一关。
+      const meta = LEVEL_META.find((m) => m.id === levelId);
       if (meta) {
-        lb.textContent = `${meta.emoji} 第 ${meta.id} 关 · ${meta.name}`;
+        lb.textContent = `🗺️ 回地图 · 第 ${meta.id} 关`;
       }
     } catch (_) { /* localStorage 或 DOM 不在, 静默 */ }
   }

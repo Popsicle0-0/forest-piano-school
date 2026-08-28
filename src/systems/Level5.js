@@ -65,6 +65,8 @@ export default function startLevel5(game) {
       left: 0;
       right: 0;
       bottom: 0;
+      /* v19.5: L5 星空背景 z-index:1 是不透明层；键盘若 z:auto 会被完整盖住。 */
+      z-index: 2;
       height: clamp(92px, 24%, 170px);
     }
     #stage > .keyboard-area > svg.keyboard {

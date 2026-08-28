@@ -46,8 +46,9 @@ const DRUM_X_PCT = 0.50;
 // 敲击时间窗 (ms): 泡泡到达时刻 ±250ms 内敲击算正确
 const HIT_WINDOW_MS = 260;
 
-// 大型 cue 脉动持续时间 (ms) — 与敲击时间窗对齐
-const CUE_PULSE_MS = 320;
+// v19.5: 原 320ms cue 太短，儿童还没看清"该不该敲"就消失。
+// 延长为 620ms（包含命中窗口前后），状态卡会给出更直白的文字反馈。
+const CUE_PULSE_MS = 620;
 
 // 通关计算: 错 0/1=3⭐, 2-3=2⭐, 4-5=1⭐, 6+=0⭐
 function calcStars(wrongCount, totalBeats) {
@@ -103,9 +104,29 @@ export default function startLevel4(game) {
   game._level4Timeouts = [];  // 收集所有 setTimeout 以便 teardown 时清理
   game._level4CueTimers = []; // 收集 cue 脉动 setTimeout 以便 teardown 时清理
 
-  // 4) 泡泡容器 + 流动几何 (v19: 先建容器, 再量几何)
-  game.stage.insertAdjacentHTML('beforeend', '<div class="level4-bubbles-container"></div>');
+  // 4) 节奏说明卡 + 泡泡容器 + 流动几何
+  // v19.5: 旧版只让泡泡掠过，儿童没有明确的"现在敲/现在等"文本。
+  // 状态卡永远说清当前动作；颜色与鼓面 cue 同步。
+  game.stage.insertAdjacentHTML('beforeend', `
+    <div class="level4-rhythm-guide" role="status" aria-live="polite">
+      <div class="level4-rhythm-guide__label">👀 看泡泡，等它碰到鼓</div>
+      <div class="level4-rhythm-guide__state">现在先等一等</div>
+      <div class="level4-rhythm-guide__count">节拍 0 / ${total}</div>
+    </div>
+    <div class="level4-bubbles-container"></div>
+  `);
   const bubblesContainer = game.stage.querySelector('.level4-bubbles-container');
+  const rhythmGuide = game.stage.querySelector('.level4-rhythm-guide');
+  const rhythmState = rhythmGuide?.querySelector('.level4-rhythm-guide__state');
+  const rhythmCount = rhythmGuide?.querySelector('.level4-rhythm-guide__count');
+  const setRhythmGuide = (mode, text) => {
+    if (!rhythmGuide || !rhythmState) return;
+    rhythmGuide.dataset.state = mode;
+    rhythmState.textContent = text;
+  };
+  const updateRhythmCount = () => {
+    if (rhythmCount) rhythmCount.textContent = `节拍 ${game._level4Processed} / ${total}`;
+  };
 
   // v19 布局核心: 泡泡容器是 #stage 内的 absolute 全覆盖层 — HUD 和底部气泡
   // 已把视口空间分走, 用 window.innerWidth/innerHeight 算百分比得到的轨迹会
@@ -214,6 +235,7 @@ export default function startLevel4(game) {
     // 大型红环 + 目标环 + 鼓面色变金 (by class, auto-removed after pulse)
     if (drumAnchor) drumAnchor.classList.add('level4-cue-now');
     if (cueLarge) cueLarge.classList.add('level4-cue-active');
+    setRhythmGuide('hit', '🥁 现在敲鼓！');
     // 预响: 轻盈气泡, 提醒孩子准备敲
     try { game.audio.hover(); } catch (_) {}
     // 自动清除
@@ -285,6 +307,7 @@ export default function startLevel4(game) {
       if (game._level4Done) return;
       bubble.remove();
       game._level4Processed++;
+      updateRhythmCount();
 
       const remainingIdx = game._level4Pending.findIndex((p) => p.absoluteIdx === absoluteIdx);
       if (remainingIdx >= 0) {
@@ -296,7 +319,9 @@ export default function startLevel4(game) {
         // 漏敲时也清除 cue 状态
         if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
         if (cueLarge) cueLarge.classList.remove('level4-cue-active');
+        setRhythmGuide('miss', '❌ 漏了一拍，下一颗再试');
         game.say('咦, 漏了一拍! 跟着泡泡到鼓位再敲');
+        game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 看下一颗泡泡，先等一等'), 700));
       }
 
       // 通关?
@@ -354,8 +379,10 @@ export default function startLevel4(game) {
         // 清除 cue 状态
         if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
         if (cueLarge) cueLarge.classList.remove('level4-cue-active');
+        setRhythmGuide('good', '✅ 对上啦！继续看下一颗');
         const praises = ['咚!', '咚!咚!', '完美!', '棒呀!', '节拍对!'];
         game.say(praises[Math.min(game._level4Correct - 1, praises.length - 1)]);
+        game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 看下一颗泡泡，先等一等'), 560));
       } else {
         // 错敲: 无 pending 拍子匹配
         game.wrongCount++;
@@ -367,7 +394,9 @@ export default function startLevel4(game) {
         // 清除 cue 状态 (避免持续变色)
         if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
         if (cueLarge) cueLarge.classList.remove('level4-cue-active');
+        setRhythmGuide('bad', '✋ 现在先别敲，等泡泡到鼓');
         game.say('咦, 现在不是节拍! 看泡泡到鼓位再敲');
+        game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 看泡泡，等它碰到鼓'), 720));
       }
     };
     drum.addEventListener('pointerdown', onTap);
