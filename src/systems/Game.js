@@ -956,11 +956,19 @@ export class Game {
     ).join('');
 
     const mistakes = this.wrongCount;
+    const isL1 = wonLevel === 1;
     const isL2 = wonLevel === 2;
-    const title = isL2 ? '🎉 第二关完成!' : '🎉 第一关完成!';
-    const subText = isL2 ? '你的耳朵越来越灵啦! 听音找鱼全对~' : '你已经认识了 Do Re Mi Fa Sol La Si';
-    const doneCount = isL2 ? (this._level2Total || 5) : NOTES.length;
-    const doneLabel = isL2 ? '答对题数' : '正确放置';
+    // v19.4: 项目早已扩展到 16 关，但 v17 时代的结束页只区分
+    // "第一关"和"其他"，导致第 2 关一完成就误判成"全部完成"。
+    // 现在 1–15 关统一给下一关，只有 L16 才是真正的课程终点。
+    const title = `🎉 第 ${wonLevel} 关完成!`;
+    const subText = isL1
+      ? '你已经认识了 Do Re Mi Fa Sol La Si'
+      : isL2
+        ? '你的耳朵越来越灵啦! 听音找鱼全对~'
+        : '太棒了! 继续下一关，森林里的新挑战正在等你~';
+    const doneCount = isL2 ? (this._level2Total || 5) : (isL1 ? NOTES.length : '✓');
+    const doneLabel = isL2 ? '答对题数' : (isL1 ? '正确放置' : '关卡挑战');
 
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
@@ -1024,12 +1032,14 @@ export class Game {
     }
 
     const nextBtn = overlay.querySelector('#next-btn');
-    if (wonLevel === 1) {
-      nextBtn.textContent = '第 2 关 ›';
+    const LAST_LEVEL_ID = 16;
+    if (wonLevel < LAST_LEVEL_ID) {
+      const nextLevelId = wonLevel + 1;
+      nextBtn.textContent = `第 ${nextLevelId} 关 ›`;
       nextBtn.onclick = () => {
         overlay.remove();
-        this.say('第二关马上来...');
-        this.start({ levelId: 2 });
+        this.say(`第 ${nextLevelId} 关马上来...`);
+        this.start({ levelId: nextLevelId });
       };
     } else {
       nextBtn.textContent = '🎉 全部完成';
@@ -1067,24 +1077,29 @@ export class Game {
     }
   }
 
-  /** 全部关卡完成: 庆祝 + 预告更多关卡 */
+  /** 全部关卡完成: 16 关课程真正通关后的庆祝 */
   _showAllDoneOverlay() {
     document.querySelectorAll('.overlay').forEach((el) => el.remove());
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
       <div class="overlay__card">
-        <div class="overlay__title">🌟 全部完成!</div>
-        <div class="overlay__text">已经认识了 7 个音符 + 听音找鱼<br>更多关卡以后解锁~</div>
+        <div class="overlay__title">🌟 森林钢琴大师!</div>
+        <div class="overlay__text">你完成了全部 16 关挑战!<br>从认识音符到节奏阶梯，真的太厉害啦~</div>
         <div class="overlay__btns">
-          <button class="btn-secondary" id="replay-btn">↻ 再玩一次 (第 1 关)</button>
+          <button class="btn-secondary" id="map-btn">🗺️ 回关卡地图</button>
+          <button class="btn-primary" id="replay-btn">↻ 再玩一次 (第 1 关)</button>
         </div>
       </div>
     `;
     document.body.appendChild(overlay);
+    overlay.querySelector('#map-btn').onclick = () => {
+      overlay.remove();
+      this.goHome();
+    };
     overlay.querySelector('#replay-btn').onclick = () => {
       overlay.remove();
-      this._skipStartOverlayOnce = true; // v19.1: 全部完成后的重玩同样直入
+      this._skipStartOverlayOnce = true;
       this.start({ levelId: 1 });
     };
   }
