@@ -409,14 +409,10 @@ export class Game {
   // ============================================================
 
   _handleLevel2Answer(id, fish) {
-    // v19: 同鱼防重复; 答错的另一条鱼立刻可点(重试零等待)
-    if (this._level2FirstTap) {
-      if (Date.now() - (this._lastTapTime || 0) < 250 && this._lastTapEl === fish) return;
-    } else {
-      this._level2FirstTap = true;
-    }
-    this._lastTapTime = Date.now();
-    this._lastTapEl = fish;
+    // v19.2: FishPool 点选模式已经在 pointerdown 做完"同鱼才拦"，
+    // 这里不能再做第二次同一把时间戳判断，否则第一次点击刚被 FishPool
+    // 写入时间戳就会在此处立刻 return，表面仍是"点鱼没反应"。
+    // 题目锁 _level2AnswerNote 本身已保证答对后不能重复结算。
 
     if (id === this._level2AnswerNote) {
       // 答对

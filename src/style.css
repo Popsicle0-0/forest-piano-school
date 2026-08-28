@@ -339,15 +339,24 @@ body::before {
 
 /* v17: 已正确放置的鱼 — 不可拖不可点, 视觉变淡 */
 .fish-pool .fish.fish--locked {
-  opacity: 0.65;
-  filter: grayscale(0.4);
-  pointer-events: none !important; /* 关键: 让 click/pointer 一概穿透 */
+  /* v19.2 真机修复: L1 正确归位后鱼会飞到五线谱 slot; 原尺寸
+     仍是 66~84px，盖住相邻 slot，后半程无法辨认/落点。归位鱼只是
+     装饰性"到家纪念"，缩到 42% 并淡出，真正的完成状态由 Staff
+     的彩色音符+唱名承担；pointer-events 继续穿透，绝不挡其他位置。 */
+  opacity: 0.42;
+  filter: grayscale(0.35);
+  pointer-events: none !important;
   cursor: default;
   animation: none !important;
 }
 
 .fish-pool .fish.fish--locked .fish-inner {
   animation: none !important; /* 停掉 fishFloat 浮动 */
+}
+/* 挂在 wrapper 的 GSAP x/y 位移保留，视觉缩小放在内层以不破坏归位坐标 */
+.fish-pool .fish.fish--locked .fish-inner > svg {
+  transform: scale(0.42);
+  transform-origin: 50% 50%;
 }
 
 /* === Pip 鸟 === */
@@ -6474,8 +6483,12 @@ body.large-text .level-map-tile__desc { font-size: 13px !important; }
   .stage--stack .staff-wrap { flex: 4 1 0; min-height: 64px; padding-top: 0; }
   .stage--stack .fish-pool { flex: 6 1 0; min-height: 112px; }
   .stage--stack .keyboard-area.stage__kb-area {
-    height: clamp(72px, 24%, 110px);
-    min-height: 70px;
+    /* v19.2: 以前 72~110px 的高度配 preserveAspectRatio:meet，560:220
+       的钢琴会为了完整高度在横屏只占约 180~280px 宽，看起来"很窄"。
+       键盘 SVG 已改为 preserveAspectRatio:none 横向撑满；给它 88px 起步
+       仍能保住短屏总高度预算，同时白键的有效宽度覆盖整个舞台。 */
+    height: clamp(88px, 27%, 122px);
+    min-height: 86px;
   }
 }
 

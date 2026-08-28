@@ -107,6 +107,15 @@ main.js 从 662 行减到 383 行；bundle 减 ~2.3kB。
 - 外接键盘数字直跳时调用 `unlockOnGesture()`，首次直跳也有声音。
 - Waveform 检测 stage 清场后的孤儿 canvas 并重建。
 
+## 7.2 v19.2 第二轮真机反馈热修复
+
+| 反馈 | 根因 | 修复 |
+|---|---|---|
+| L1 横屏钢琴太窄 | 短屏键盘盒高度缩到 72px 后，SVG 使用 `preserveAspectRatio="meet"`；560×220 固有比例为保全高度而只占中间窄带 | 键盘 SVG 改为横向撑满盒子的 `preserveAspectRatio="none"`，短屏键盘高度同步提高到 88–122px；白键覆盖完整舞台宽度 |
+| 归位鱼挡住其他五线谱位置 | 正确鱼仍保留原 66–84px 实体，飞进相邻仅几十像素的 slot 区后遮挡 | 锁定鱼的内层 SVG 缩为 42% + 降低透明度；完成状态由五线谱自身彩色音符和唱名承担，鱼不再挡落点 |
+| 横屏中右侧卡半透明矩形 | 常驻 320×80 音频 Waveform canvas 的毛玻璃背景 | 关闭该非玩法调试 UI；不再创建/重建 canvas |
+| L2 点鱼仍无任何反应 | 部分 iOS PWA 不合成 click；即使 pointerdown 触发回调，Game 内第二层时间戳锁又立即把第一次答案判定 return | 点选模式改为 pointerdown 直接触发 onTap，click 仅作去重兜底；删除 Game 的重复防抖，题目锁本身负责防重复结算 |
+
 ## 8. 真机验收清单 (交给用户)
 
 iPhone 17 Pro / iPad Pro 任一设备：

@@ -18,7 +18,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v19.1';
+const APP_VERSION = 'v19.2';
 
 // 全局单例(便于控制台调试)
 window.__forestPiano = { Game, Audio, Progress, version: APP_VERSION };

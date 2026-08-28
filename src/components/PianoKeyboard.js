@@ -120,7 +120,7 @@ export class PianoKeyboard {
     wrap.innerHTML = `
       <svg class="keyboard" xmlns="${SVG_NS}"
            viewBox="0 0 ${KBD_W} ${WHITE_H}"
-           preserveAspectRatio="xMidYMid meet"
+           preserveAspectRatio="none"
            aria-label="钢琴键盘(C4-B4)">
         ${inner}
       </svg>

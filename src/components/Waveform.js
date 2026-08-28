@@ -23,23 +23,11 @@ export class Waveform {
   }
 
   show() {
-    // v19 审查修复: Game 构造时 show() 挂进 stage 的画布会被随后的
-    // Game.start() 清场 innerHTML='' 带走, 旧代码的 `if (this.canvas)
-    // return` 把悬空的旧引用挡在门口 → 波形从此失明且循环空转。
-    // 现在: 只要画布不在文档里就重建; 已有的 rAF 循环按属性读取
-    // this.canvas, 会自动接上新画布, 不产生第二个循环。
-    if (this.canvas && this.canvas.isConnected) return;
-    const canvas = document.createElement('canvas');
-    canvas.className = 'waveform-canvas';
-    canvas.width = 320;
-    canvas.height = 80;
-    this.stage.appendChild(canvas);
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    if (!this._running) {
-      this._running = true;
-      this._loop();
-    }
+    // v19.2: 波形是调试/锦上添花而不是游戏内容。真实横屏反馈出现一个
+    // "中间右侧半透明矩形"，正是这个 320×80 canvas 的毛玻璃背景。
+    // 它会遮住鱼/五线谱，儿童游戏不该常驻这种技术 UI，彻底默认关闭。
+    // 仍保留实现，未来若需要可由设置显式调用 enable()。
+    this.hide();
   }
 
   hide() {
