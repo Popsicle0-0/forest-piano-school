@@ -11,10 +11,15 @@ import { gsap } from 'gsap';
 // 吸附容差 (px) — 鱼在底部,五线谱在顶部,需要更大容错
 const SNAP_RADIUS = 280;
 const POOL_PAD_X = 50;   // 鱼左右边缘 padding (避免鱼靠边)
-// 单条鱼的近似可视尺寸 (Fish.js 自适应,这里只用于布局估算)
-const FISH_SLOT_W = 84;  // was 96 — 缩小 17% 让鱼更小更分散
-const FISH_SLOT_H = 64;  // was 76 — 缩小给鱼更多垂直散开空间
-const FISH_MIN_DIST = 56; // v19: 基准间距, 实际值随容器高度缩放
+// v19.3: wrapper 是稳定的触控热区，视觉鱼会在 inner 再缩放。
+// 旧 84×64 视觉实体太大：进五线谱后遮住邻位，池中 7 条也会互压。
+// 改为更紧凑的 68×52 热区 + 更大的防撞距离，既能抓住也不会挡谱。
+const FISH_SLOT_W = 68;
+const FISH_SLOT_H = 52;
+const FISH_MIN_DIST = 72; // 必须 >= 视觉鱼宽，不能再用 56 让实体重叠
+
+// 视觉鱼相对触控 wrapper 的缩放。触控区保留 68×52，儿童手指仍好抓；
+// 真正看到的鱼约为 78%，从根上消除池中/谱上遮挡。
 
 /**
  * v19 核心修复之一: 鱼体布局参数不再写死。
@@ -27,8 +32,9 @@ const FISH_MIN_DIST = 56; // v19: 基准间距, 实际值随容器高度缩放
  */
 function layoutMetrics(poolRect) {
   const availH = Math.max(48, poolRect.height - 8);
-  // 以"能放下两行"为基准线; 高度充裕时 k=1 保持原设计大小
-  const k = Math.min(1, Math.max(0.55, availH / (FISH_SLOT_H * 2 + 24)));
+  // 以"能放下两行"为基准线; 视觉鱼已由 inner 缩放，故下限 0.62
+  // 仍保留足够触控热区，避免短屏把鱼缩成不可抓的小点。
+  const k = Math.min(1, Math.max(0.62, availH / (FISH_SLOT_H * 2 + 24)));
   return {
     slotW: Math.round(FISH_SLOT_W * k),
     slotH: Math.round(FISH_SLOT_H * k),
@@ -49,7 +55,8 @@ function injectStyles() {
     .fish-inner {
       transform-origin: 50% 50%;
       will-change: transform;
-      transform: rotate(var(--fish-rot, 0deg)); /* 静态旋转在 inner:视觉倾斜,不影响 hit area */
+      /* v19.3: 内层缩小，外层 wrapper 保持完整手指热区 */
+      transform: rotate(var(--fish-rot, 0deg)) scale(var(--fish-visual-scale, 0.78));
       width: 100%;
       height: 100%;
       pointer-events: none; /* 事件穿透到 .fish wrapper */
@@ -61,8 +68,10 @@ function injectStyles() {
        (原来放 inner, wrapper 不动, 鱼浮起时 hit 区比鱼低 12px → 触屏"模糊") */
     /* v18.2: 把"小浮动"和"呼吸缩放"合并成单一 keyframe, 4s 一循环 */
     @keyframes fishFloat {
+      /* v19.3: L1 目标很密，原 -6px/1.03 呼吸会让鱼看起来闪烁、
+         彼此擦边；改为几乎静止的生命感，不干扰对位。 */
       0%, 100% { transform: translateY(0)    scale(1.00); }
-      50%      { transform: translateY(-6px) scale(1.03); }
+      50%      { transform: translateY(-2px) scale(1.01); }
     }
     .fish.is-floating {
       animation: fishFloat var(--fish-float-dur, 4s) ease-in-out
