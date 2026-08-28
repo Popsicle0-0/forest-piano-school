@@ -71,6 +71,9 @@ export class Level4Scene {
 
         <!-- === 大鼓锚点 (中央偏下) === -->
         <g class="level4-drum-anchor" transform="translate(400 340)">
+          <!-- v20: 真实触控热区覆盖视觉红圈，孩子点红圈/鼓边都算敲鼓；
+               透明且在最底层，不改变画面。 -->
+          <circle class="level4-drum-hit-area" cx="0" cy="0" r="145" fill="transparent" />
           <!-- 同心圆目标环 (持续呼吸 — cue 到达时高亮闪一次) -->
           <circle class="level4-target-ring level4-target-ring--3" cx="0" cy="0" r="170"
                   fill="none" stroke="rgba(255,82,82,0.18)" stroke-width="2" />
@@ -193,8 +196,13 @@ export class Level4Scene {
     return this.stage ? this.stage.querySelector('.level4-beat-cue') : null;
   }
 
-  /** 查找大鼓 DOM 引用 */
+  /** 查找可敲击热区：比实际鼓面更大，与红圈提示范围一致。 */
   getDrum() {
+    return this.stage ? this.stage.querySelector('.level4-drum-hit-area') : null;
+  }
+
+  /** 实际鼓面：供下沉/震动动画使用，不承担点击范围。 */
+  getDrumVisual() {
     return this.stage ? this.stage.querySelector('.level4-drum-wrap') : null;
   }
 
@@ -215,7 +223,7 @@ export class Level4Scene {
 
   /** 获取鼓中心的屏幕坐标 (含 viewport 偏移) — 用于在 drum 周围 spawn DOM FX */
   getDrumScreenCenter() {
-    const drum = this.getDrum();
+    const drum = this.getDrumVisual() || this.getDrum();
     if (!drum) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     const rect = drum.getBoundingClientRect();
     return {

@@ -99,6 +99,7 @@ export default function startLevel6(game) {
       left: 0;
       right: 0;
       bottom: 0;
+      z-index: 2; /* v20: 高于不透明教室背景(z1)，否则键盘不可见/不可点 */
       height: var(--lv6-kb-h);
     }
     #stage > .keyboard-area > svg.keyboard {

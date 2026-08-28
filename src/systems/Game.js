@@ -1120,6 +1120,15 @@ export class Game {
    *  - 重新开始关卡逻辑 (不开开始遮罩, 让玩家立即进入)
    */
   restartLevel() {
+    // v20: HUD ↻ 不再是 L1 专用 reset。L3/L4/L5 等独立关卡有自己的
+    // closure 状态、计时器和场景，局部 reset 会留下旧节拍/旧音符。
+    // 当前关不是 L1/L2 时统一走 start() 的 teardown→清场→重建链路。
+    const currentId = window.__forestPiano?.currentLevelId || 1;
+    if (currentId > 2) {
+      this._skipStartOverlayOnce = true;
+      this.start({ levelId: currentId });
+      return;
+    }
     // 清遮罩
     document.querySelectorAll('.overlay').forEach((el) => el.remove());
     this._showLevel2HUD(false);

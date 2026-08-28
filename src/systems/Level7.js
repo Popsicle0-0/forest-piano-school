@@ -90,14 +90,16 @@ export default function startLevel7(game) {
   game.fishPool.onDragMove = () => {};
 
   // 6) 拖拽释放 — 接近判定
-  game.fishPool.onDrop = (fish, _slotEl, _accepted) => {
+  game.fishPool.onDrop = (fish, _slotEl, _accepted, dropPoint) => {
     const id = fish.dataset.id;
     if (game._level7Placed.has(id)) return;     // 已放对, 不再触发
 
-    // 鱼中心点
+    // v20: FishPool 回调前已复位鱼，必须使用复位前的真实松手坐标。
+    // 旧版取 fish rect 会永远判定鱼池原位，导致“拖到台阶也匹配不上”。
+    const fx = dropPoint?.x;
+    const fy = dropPoint?.y;
+    if (!Number.isFinite(fx) || !Number.isFinite(fy)) return;
     const fr = fish.getBoundingClientRect();
-    const fx = fr.left + fr.width / 2;
-    const fy = fr.top + fr.height / 2;
 
     // 找最近的台阶
     let best = null, bestDist = Infinity;

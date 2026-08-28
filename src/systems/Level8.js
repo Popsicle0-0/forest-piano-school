@@ -85,6 +85,7 @@ export default function startLevel8(game) {
       left: 0;
       right: 0;
       bottom: 0;
+      z-index: 2; /* v20: 高于不透明音乐会背景(z1)，确保键盘可见可点 */
       height: var(--lv8-kb-h);
     }
     #stage > .keyboard-area > svg.keyboard {

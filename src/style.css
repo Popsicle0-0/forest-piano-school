@@ -1517,6 +1517,14 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 .level4-drum-anchor {
   pointer-events: auto;
   /* 当 cue-now 激活, 让鼓面整体色偏金黄, 提示"现在该敲" */
+}
+/* 真实热区比鼓面稍大，视觉红环指向哪里，手指就能点哪里。 */
+.level4-drum-hit-area {
+  pointer-events: all;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.level4-drum-anchor {
   transition: filter 180ms ease-out;
 }
 .level4-drum-anchor.level4-cue-now {
