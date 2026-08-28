@@ -133,7 +133,22 @@ echo "  (推送 main 成功)"
 # ---------- 5. 发 gh-pages (HANDOFF §5 步骤 4) ----------
 hdr "阶段 B: 用 dist/ 内容强刷 gh-pages"
 DEPLOY_TMP="$(mktemp -d)"
-trap 'rm -rf "$DEPLOY_TMP"' EXIT
+# v19.5.1: orphan 发布会在当前 worktree 执行 find ... rm -rf，gitignored
+# 的 docs/CREDENTIALS.md 不会被 git checkout 恢复。先备份到仓库外的临时
+# 文件，回 main 后再恢复；否则会删除 OSS/RAM 密钥并让后续自动同步失效。
+CREDENTIALS_TMP="$(mktemp)"
+if [ -f docs/CREDENTIALS.md ]; then
+  cp docs/CREDENTIALS.md "$CREDENTIALS_TMP"
+fi
+restore_credentials() {
+  if [ -s "$CREDENTIALS_TMP" ] && [ ! -f docs/CREDENTIALS.md ]; then
+    mkdir -p docs
+    cp "$CREDENTIALS_TMP" docs/CREDENTIALS.md
+    echo "  (已恢复本地 gitignored 部署凭证)"
+  fi
+  rm -rf "$DEPLOY_TMP" "$CREDENTIALS_TMP"
+}
+trap restore_credentials EXIT
 cp -r dist/. "$DEPLOY_TMP/"
 
 FAIL_FLAG=0

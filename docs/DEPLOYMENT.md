@@ -124,6 +124,7 @@ AccessKey Secret: <RAM部署用户的Secret>
 - 权限仅限 `forest-piano-kino` 的 `ListObjects/GetObject/PutObject/DeleteObject`；
 - 绝不将 AccessKey ID/Secret 贴到聊天、Issue、Git、截图或网页代码；
 - 换电脑时，重新创建或安全转移 RAM 部署凭证，再本地写入这个 gitignored 文件；
+- 部署脚本在 orphan `gh-pages` 清场前会将该文件备份到仓库外临时位置、回 `main` 后恢复；**该机制从 v19.5.1 起才存在**。旧版本脚本可能会删掉 gitignored 凭证，部署后必须检查该文件仍在；
 - 怀疑泄露时，立即在阿里云 RAM 禁用/删除该 AccessKey 并创建新的。
 
 ---
