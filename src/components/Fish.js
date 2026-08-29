@@ -93,13 +93,23 @@ export class Fish {
     const { showLabel } = this;
     const idKey = (id || 'do').toLowerCase();
 
-    // 大幅随机化 — 每条鱼都是独特的角色 (±15° + 大小变化 + 泡泡/腮红变化)
-    const rot = (Math.random() * 30 - 15).toFixed(1);
-    const scaleVar = (0.85 + Math.random() * 0.30).toFixed(2);
-    const blinkOffset = (Math.random() * 2).toFixed(2);
-    const hasBubble = Math.random() > 0.4;        // 60% 概率有思考泡泡
-    const bubbleR = (1.5 + Math.random() * 1.5).toFixed(1);
-    const blushOpacity = (0.4 + Math.random() * 0.35).toFixed(2);
+    // v21: 角色身份必须稳定。旧版每次 render 都 Math.random，Do 鱼会像
+    // 新生成的一只角色，缺乏作者设定感。以音名 id 生成固定 seed，只保留
+    // 微妙的、可重复的手作不对称。
+    let seed = [...idKey].reduce((value, char) => ((value * 31) + char.charCodeAt(0)) >>> 0, 2166136261);
+    const rand = () => {
+      seed += 0x6D2B79F5;
+      let t = seed;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const rot = ((rand() * 8) - 4).toFixed(1);
+    const scaleVar = (0.94 + rand() * 0.08).toFixed(2);
+    const blinkOffset = (rand() * 1.4).toFixed(2);
+    const hasBubble = rand() > 0.7;
+    const bubbleR = (1.7 + rand() * 0.5).toFixed(1);
+    const blushOpacity = (0.38 + rand() * 0.16).toFixed(2);
 
     // 派生同色系的深/浅色(尾巴/背鳍),让身体更有层次
     const shadeHex = (hex, percent) => {
@@ -115,8 +125,8 @@ export class Fish {
     };
 
     // 每条鱼的"体色微调"
-    const tintDir = Math.floor(Math.random() * 3);
-    const tintAmt = (8 + Math.random() * 8).toFixed(0);
+    const tintDir = Math.floor(rand() * 3);
+    const tintAmt = (8 + rand() * 8).toFixed(0);
     const tintRgb = { r: 0, g: 0, b: 0 };
     if (tintDir === 0) { tintRgb.r = +tintAmt; tintRgb.g = +Math.floor(tintAmt / 2); }
     else if (tintDir === 1) { tintRgb.b = +tintAmt; tintRgb.g = +Math.floor(tintAmt / 2); }
@@ -133,13 +143,13 @@ export class Fish {
     const bodyLighter = shadeHex(bodyColor, 22);
 
     // 鱼身后小水泡 (trail)
-    const trailBubbleCount = Math.random() > 0.5 ? 2 : 1;
+    const trailBubbleCount = rand() > 0.5 ? 2 : 1;
     const trailBubbles = Array.from({ length: trailBubbleCount }).map((_, i) => {
-      const rad = (1.5 + Math.random() * 1.2).toFixed(1);
+      const rad = (1.5 + rand() * 1.2).toFixed(1);
       const x = -6 - i * 5;
       const y = 32 + (i % 2 === 0 ? 0 : 6);
-      const dur = (2.4 + Math.random() * 1.6).toFixed(2);
-      const begin = (Math.random() * 2).toFixed(2);
+      const dur = (2.4 + rand() * 1.6).toFixed(2);
+      const begin = (rand() * 2).toFixed(2);
       return `
         <circle cx="${x}" cy="${y}" r="${rad}" fill="rgba(255,255,255,0.55)">
           <animate attributeName="cy" from="${y}" to="${y - 18}" dur="${dur}s"
@@ -264,8 +274,8 @@ export class Fish {
     }).join('');
 
     // E. 侧鳍 (一片或两片,随鱼摇摆动画)
-    const finSwayDur = (2.0 + Math.random() * 1.0).toFixed(2);
-    const finSwayBegin = (Math.random() * 1).toFixed(2);
+    const finSwayDur = (2.0 + rand() * 1.0).toFixed(2);
+    const finSwayBegin = (rand() * 1).toFixed(2);
     // 上侧鳍 (在背鳍前下方)
     const topFin = `
       <path d="M40,22 Q34,18 32,24 Q36,26 40,26 Z"
@@ -293,8 +303,8 @@ export class Fish {
     //   do: 蝴蝶结 (头顶); mi: 帽子; sol: 皇冠; la: 耳环
     const accessoryKey = ACCESSORY_TYPES[idKey];
     let accessorySvg = '';
-    const bobDur = (2.4 + Math.random() * 0.8).toFixed(2);
-    const bobBegin = (Math.random() * 0.6).toFixed(2);
+    const bobDur = (2.4 + rand() * 0.8).toFixed(2);
+    const bobBegin = (rand() * 0.6).toFixed(2);
     if (accessoryKey === 'bow') {
       // Do 蝴蝶结 — 头顶位置 (x≈46, y≈12),带轻微浮动
       accessorySvg = `
@@ -339,7 +349,7 @@ export class Fish {
         </g>`;
     } else if (accessoryKey === 'crown') {
       // Sol 小皇冠 — 头顶位置 (x≈46, y≈8),微微闪烁
-      const sparkleDur = (1.6 + Math.random() * 0.6).toFixed(2);
+      const sparkleDur = (1.6 + rand() * 0.6).toFixed(2);
       accessorySvg = `
         <g style="transform-origin: 46px 14px;">
           <animateTransform attributeName="transform" type="rotate"

@@ -11,6 +11,7 @@ import { Tutorial } from './components/Tutorial.js';
 import { ThemeSwitcher, THEME_ICONS } from './components/ThemeSwitcher.js';
 import { KeyboardShortcuts } from './components/Keyboard.js';
 import { Streak } from './systems/Streak.js';
+import { icon, setIcon } from './utils/icons.js';
 
 // 主题切换器 (v18): 尽早实例化, 在首屏前应用已保存主题
 const theme = new ThemeSwitcher();
@@ -18,7 +19,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v20.4';
+const APP_VERSION = 'v21.0';
 
 // 全局单例(便于控制台调试)
 // 保留 LevelMap / Game 模块初始化时挂上的调试元数据，不能整体覆盖。
@@ -89,7 +90,7 @@ function boot() {
   levelBadge.setAttribute('role', 'button');
   levelBadge.setAttribute('aria-label', '回关卡地图');
   // v19.5: 关卡主题 emoji 不是导航语义；地图图标+可见文字对儿童更直接。
-  levelBadge.textContent = '🗺️ 回地图 · 第 1 关';
+  levelBadge.innerHTML = `${icon('map')}<span>航线地图 · 第 1 关</span>`;
   const hudLeftForBadge = document.querySelector('.hud__left');
   if (hudLeftForBadge) hudLeftForBadge.insertBefore(levelBadge, hudLeftForBadge.firstChild);
   // 点击徽章 → 回关卡地图 (解决"不知道怎么玩别的关卡")
@@ -122,10 +123,15 @@ function boot() {
   const btnReplay = document.getElementById('btn-replay');
   const btnBGM = document.getElementById('btn-bgm');
   const btnHome = document.getElementById('btn-home');
+  // v21: 控件不用系统 emoji；统一原创圆端线条图标，视觉跨设备稳定。
+  setIcon(btnSound, 'sound');
+  setIcon(btnReplay, 'replay');
+  setIcon(btnBGM, 'music');
+  setIcon(btnHome, 'home');
   if (btnSound) {
     btnSound.addEventListener('click', () => {
       const muted = game.audio.toggleMute();
-      btnSound.textContent = muted ? '🔇' : '🔊';
+      setIcon(btnSound, muted ? 'muted' : 'sound');
     });
   }
   if (btnReplay) {
@@ -137,7 +143,7 @@ function boot() {
   if (btnBGM) {
     btnBGM.addEventListener('click', () => {
       const on = bgm.toggle();
-      btnBGM.textContent = on ? '🎶' : '🔇';
+      setIcon(btnBGM, on ? 'music' : 'muted');
       btnBGM.style.background = on ? 'rgba(255, 235, 168, 0.4)' : '';
     });
   }
@@ -158,7 +164,7 @@ function boot() {
   btnSettings.id = 'btn-settings';
   btnSettings.setAttribute('aria-label', '设置');
   btnSettings.setAttribute('title', '设置');
-  btnSettings.textContent = '⚙';
+  btnSettings.innerHTML = icon('settings');
   document.querySelector('.hud__right')?.appendChild(btnSettings);
 
   btnSettings.addEventListener('click', () => {
@@ -178,7 +184,7 @@ function boot() {
     btnAch.id = 'btn-achievements';
     btnAch.setAttribute('aria-label', '成就墙');
     btnAch.title = '成就墙';
-    btnAch.textContent = '🏆';
+    btnAch.innerHTML = icon('trophy');
     // 插在首位, 让玩家最容易点到 (在 🔊 ↻ ⌂ 之前)
     hudRight.insertBefore(btnAch, hudRight.firstChild);
 
@@ -201,7 +207,7 @@ function boot() {
     btnLeaderboard.id = 'btn-leaderboard';
     btnLeaderboard.setAttribute('aria-label', '排行榜');
     btnLeaderboard.setAttribute('title', '我的成就');
-    btnLeaderboard.textContent = '📊';
+    btnLeaderboard.innerHTML = icon('chart');
     hudRight.appendChild(btnLeaderboard);
     btnLeaderboard.addEventListener('click', () => {
       import('./components/Leaderboard.js').then(({ Leaderboard }) => {
@@ -218,7 +224,7 @@ function boot() {
     btnPractice.id = 'btn-practice';
     btnPractice.setAttribute('aria-label', '自由演奏');
     btnPractice.title = '自由演奏';
-    btnPractice.textContent = '🎹';
+    btnPractice.innerHTML = icon('piano');
     hudRight.appendChild(btnPractice);
 
     btnPractice.addEventListener('click', () => {
@@ -236,7 +242,7 @@ function boot() {
     btnSongs.id = 'btn-songs';
     btnSongs.setAttribute('aria-label', '歌曲库');
     btnSongs.title = '歌曲库';
-    btnSongs.textContent = '🎵';
+    btnSongs.innerHTML = icon('song');
     hudRight.appendChild(btnSongs);
 
     btnSongs.addEventListener('click', () => {
@@ -255,7 +261,7 @@ function boot() {
     btnHelp.id = 'btn-help';
     btnHelp.setAttribute('aria-label', '帮助');
     btnHelp.setAttribute('title', '教程');
-    btnHelp.textContent = '📖';
+    btnHelp.innerHTML = icon('book');
     document.querySelector('.hud__right')?.appendChild(btnHelp);
     btnHelp.addEventListener('click', () => {
       const tut = new Tutorial(document.body, { onDone: () => {} });
@@ -270,11 +276,11 @@ function boot() {
     btnTheme.id = 'btn-theme';
     btnTheme.setAttribute('aria-label', '主题');
     btnTheme.title = '主题';
-    btnTheme.textContent = THEME_ICONS[theme.current] || '🎨';
+    btnTheme.innerHTML = icon('palette');
     document.querySelector('.hud__right')?.appendChild(btnTheme);
     btnTheme.addEventListener('click', () => {
       const next = theme.cycle();
-      btnTheme.textContent = next.icon;
+      btnTheme.innerHTML = icon('palette');
       // 短暂提示当前主题
       const flash = document.createElement('div');
       flash.className = 'theme-flash';

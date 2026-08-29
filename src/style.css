@@ -6686,3 +6686,106 @@ body.large-text .level-map-tile__desc { font-size: 13px !important; }
 @media (min-width: 768px) and (min-height: 700px) {
   .level2-progress-dots { bottom: calc(clamp(120px, 22%, 210px) + 14px); }
 }
+
+/* ============================================================
+   森林制琴工坊 · Visual foundation (v21)
+   统一左上光源、纸张/木头/黄铜材质；装饰层永远不接收事件。
+   ============================================================ */
+:root {
+  --atelier-paper: #f4f0e4;
+  --atelier-paper-deep: #e2dac6;
+  --atelier-wood: #5b4033;
+  --atelier-brass: #b4864c;
+  --atelier-ink: #20343a;
+  --atelier-shadow: rgba(36, 49, 53, 0.22);
+  --depth-contact: 0 3px 0 rgba(39,36,39,.28), 0 9px 18px var(--atelier-shadow);
+  --depth-raised: 0 2px 0 rgba(255,248,228,.62) inset, 0 5px 0 rgba(58,42,39,.24), 0 13px 24px var(--atelier-shadow);
+  --depth-floating: 0 1px 0 rgba(255,248,228,.78) inset, 0 8px 0 rgba(58,42,39,.18), 0 20px 34px rgba(29,34,39,.34);
+}
+.atelier-icon { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.hud { background:linear-gradient(180deg,rgba(251,247,235,.96),rgba(232,224,205,.91)); border:1px solid rgba(109,86,58,.22); border-top:0; border-radius:0 0 18px 18px; box-shadow:0 2px 0 rgba(255,255,244,.82) inset,0 7px 18px rgba(48,51,47,.14); backdrop-filter:none; }
+.hud__btn { color:var(--atelier-ink); background:linear-gradient(145deg,#fffdf4,#e6dcc7); border:1px solid rgba(84,62,48,.2); box-shadow:var(--depth-raised); }
+.hud__btn:hover { background:linear-gradient(145deg,#fffef8,#eee2cc); box-shadow:var(--depth-floating); }
+.hud__btn:active { transform:translateY(3px) scale(.97); box-shadow:0 1px 0 rgba(255,255,244,.7) inset; }
+.level-badge { gap:7px; color:var(--atelier-ink); background:linear-gradient(145deg,#f7f1e1,#d8c7a9); border:1px solid rgba(83,63,47,.27); box-shadow:var(--depth-raised); }
+.bubble { color:var(--atelier-ink); background:linear-gradient(145deg,#fbf7ec,#e7ddc8); border:1px solid rgba(86,67,51,.22); box-shadow:var(--depth-raised); }
+.bubble__avatar { font-size:0; width:32px; height:32px; border-radius:50% 44% 48% 46%; background:linear-gradient(135deg,#fff8e7 0 50%,#d87558 51%); border:2px solid rgba(42,52,56,.48); box-shadow:0 2px 0 rgba(255,255,255,.7) inset,0 3px 0 rgba(45,51,49,.26); }
+
+.atelier-bg { position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.atelier-bg__art { width:100%; height:100%; display:block; }
+.atelier-bg__vignette { position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,rgba(25,51,57,.13),transparent 20% 80%,rgba(25,51,57,.15)),linear-gradient(0deg,rgba(16,45,53,.18),transparent 45%); }
+.atelier-bg__ripples path { animation:atelierRipple 7s ease-in-out infinite alternate; }
+@keyframes atelierRipple { from { transform:translateX(-8px);opacity:.2 } to { transform:translateX(9px);opacity:.52 } }
+.stage--stack .staff-wrap { margin:clamp(5px,1vh,12px) clamp(8px,2vw,28px) 0; overflow:visible; border-radius:20px; background:linear-gradient(145deg,#fffdf4,#ded2ba); border:1px solid rgba(87,67,48,.26); box-shadow:var(--depth-raised); }
+.stage--stack .staff-wrap::before { content:''; position:absolute; inset:7px; border-radius:14px; border:1px solid rgba(180,145,88,.24); pointer-events:none; }
+.stage--stack .staff__line,.stage--stack .staff__ledger { stroke:#4f6060; }
+.stage--stack .staff__clef { fill:#34454a; }
+.stage--stack .fish-pool { margin:0 clamp(8px,2vw,28px); border-radius:20px; background:linear-gradient(160deg,rgba(186,222,216,.88),rgba(73,133,144,.7)); box-shadow:0 2px 0 rgba(255,255,255,.42) inset,0 8px 0 rgba(36,79,88,.17),0 14px 20px rgba(30,65,74,.18); border:1px solid rgba(38,87,96,.38); }
+.stage--stack .keyboard-area { margin:0 clamp(8px,2vw,28px) clamp(5px,1vh,12px); width:auto; border-radius:18px 18px 12px 12px; background:linear-gradient(180deg,#7a5943 0 9%,#3d302f 10% 100%); box-shadow:0 2px 0 rgba(255,236,202,.3) inset,0 8px 0 #292326,0 15px 25px rgba(32,34,36,.28); border:1px solid rgba(40,31,31,.55); }
+.stage--stack .keyboard-area::before { content:''; position:absolute; left:5%; right:5%; top:5px; height:4px; border-radius:50%; background:rgba(238,201,142,.28); pointer-events:none; }
+.keyboard-label { color:#24363a; text-shadow:0 1px 0 rgba(255,255,255,.85); }
+.keyboard-label b { font-family:'Nunito','PingFang SC',sans-serif; font-weight:900; }
+.keyboard-label small { color:#6d665a; }
+
+/* Atelier route map: crafted navigation marks instead of emoji card grid. */
+.atelier-route-overlay { background:linear-gradient(145deg,#173b45,#355d5c 44%,#718768); overflow:hidden; }
+.atelier-route-atmosphere { position:absolute; inset:0; pointer-events:none; }
+.atelier-route-atmosphere__mist { position:absolute; width:75%; height:42%; left:-14%; top:9%; border-radius:50%; background:radial-gradient(ellipse,rgba(245,241,226,.22),transparent 68%); }
+.atelier-route-atmosphere__light { position:absolute; width:52%; height:70%; right:-7%; bottom:-18%; background:radial-gradient(ellipse,rgba(225,186,111,.18),transparent 70%); }
+.atelier-route-card { position:relative; z-index:1; width:min(94%,900px); max-height:calc(100dvh - 24px); padding:0; overflow:hidden; color:var(--atelier-ink); background:linear-gradient(145deg,#f8f3e8,#d9cfba); border:1px solid rgba(255,248,228,.58); box-shadow:0 2px 0 rgba(255,255,255,.75) inset,0 22px 60px rgba(4,24,28,.4); }
+.atelier-route-card__masthead { position:relative; display:flex; align-items:center; gap:14px; padding:clamp(16px,3vw,28px); background:linear-gradient(135deg,#f9f2df,#d9c59e); border-bottom:1px solid rgba(89,67,47,.22); }
+.atelier-route-card__sigil { width:54px; height:54px; display:grid; place-items:center; color:#f7ecd1; background:linear-gradient(145deg,#77533c,#3e3030); border-radius:18px; box-shadow:var(--depth-raised); }
+.atelier-route-card__sigil .atelier-icon { width:30px; height:30px; }
+.atelier-route-card__eyebrow { margin:0 0 2px; font:800 11px/1.2 'Nunito',sans-serif; letter-spacing:.12em; color:#78624a; }
+.atelier-route-card h1 { margin:0; font:900 clamp(28px,5vw,45px)/1 'ZCOOL KuaiLe','Nunito',sans-serif; color:#263f42; }
+.atelier-route-card__intro { margin:5px 0 0; font-size:14px; color:#5d706d; }
+.atelier-route-scroll { max-height:calc(100dvh - 210px); overflow:auto; padding:16px clamp(12px,3vw,28px) 22px; }
+.route-chapter { position:relative; margin:0 0 20px; padding:16px; border-radius:20px; background:rgba(255,253,245,.48); border:1px solid rgba(102,82,60,.17); box-shadow:0 2px 0 rgba(255,255,255,.48) inset; }
+.route-chapter::before { content:''; position:absolute; left:34px; top:60px; bottom:-23px; width:2px; background:linear-gradient(#b4864c,rgba(180,134,76,.08)); }
+.route-chapter:last-child::before { display:none; }
+.route-chapter__header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.route-chapter__index { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#355b5a; color:#f8f2df; font:900 12px 'Nunito',sans-serif; box-shadow:0 3px 0 rgba(24,54,54,.35); }
+.route-chapter h2 { margin:0; font:900 20px/1 'ZCOOL KuaiLe','Nunito',sans-serif; }
+.route-chapter p { margin:4px 0 0; color:#65736e; font-size:12px; }
+.route-chapter__mark { margin-left:auto; width:30px; height:30px; border-radius:50% 40% 45% 35%; background:linear-gradient(145deg,#d7c08e,#8da899); box-shadow:0 2px 0 rgba(255,255,255,.55) inset,0 3px 0 rgba(61,80,71,.2); }
+.route-nodes { display:grid; gap:10px; }
+.route-node { position:relative; display:grid; grid-template-columns:46px minmax(0,1fr) auto; align-items:center; gap:12px; width:100%; min-height:68px; padding:9px 12px; border:0; text-align:left; color:var(--atelier-ink); background:linear-gradient(145deg,#fffdf5,#e5ddcb); border-radius:16px; box-shadow:var(--depth-raised); cursor:pointer; overflow:hidden; touch-action:manipulation; }
+.route-node::after { content:''; position:absolute; inset:0; background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.42),transparent 60%); transform:translateX(-120%); transition:transform 500ms var(--ease-out-soft); pointer-events:none; }
+.route-node:hover::after,.route-node:focus-visible::after { transform:translateX(120%); }
+.route-node:active,.route-node.is-selected { transform:translateY(3px); box-shadow:0 1px 0 rgba(255,255,255,.7) inset; }
+.route-node__seal { position:relative; z-index:1; width:42px; height:42px; display:grid; place-items:center; border-radius:50% 46% 42% 48%; color:#fff8e7; background:linear-gradient(145deg,var(--node-accent),#395557); border:2px solid rgba(255,250,232,.68); box-shadow:0 2px 0 rgba(255,255,255,.34) inset,0 4px 0 rgba(38,59,61,.28); font:900 13px 'Nunito',sans-serif; }
+.route-node__seal::before { content:''; position:absolute; inset:-6px; border:1px dashed rgba(83,105,91,.38); border-radius:50%; }
+.route-node__copy { position:relative; z-index:1; min-width:0; }
+.route-node__copy strong { display:block; font:900 clamp(15px,2.8vw,18px)/1.15 'Nunito','PingFang SC',sans-serif; }
+.route-node__copy small { display:block; margin-top:4px; font-size:12px; line-height:1.25; color:#68746f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.route-node__stars { position:relative; z-index:1; display:flex; gap:3px; }
+.route-star { width:8px; height:8px; border-radius:50%; border:1px solid rgba(73,83,78,.35); background:rgba(255,255,255,.45); }
+.route-star.is-earned { background:#c28e42; border-color:#9e6c2f; box-shadow:0 0 0 2px rgba(194,142,66,.13); }
+.atelier-route-card__footer { padding:10px 18px; background:rgba(62,76,69,.08); color:#66736d; font-size:12px; text-align:center; }
+.atelier-continue { position:absolute; right:clamp(12px,2vw,24px); bottom:12px; display:inline-flex; align-items:center; gap:6px; min-height:38px; padding:7px 10px; color:#fbf4e2; background:linear-gradient(145deg,#557773,#284d52); border:1px solid rgba(255,255,255,.36); border-radius:12px; box-shadow:0 3px 0 rgba(27,54,56,.35); font:800 12px 'Nunito',sans-serif; cursor:pointer; }
+.atelier-continue .atelier-icon { width:16px; height:16px; }
+@media (min-width:768px) { .route-nodes { grid-template-columns:repeat(2,minmax(0,1fr)); } .route-chapter::before { left:calc(50% - 1px); } }
+
+/* v21 Splash：纸雕信标，不以 emoji 琴键作为品牌锚点。 */
+.splash { background:radial-gradient(circle at 25% 18%,#f9edd1 0,transparent 28%),linear-gradient(145deg,#193b45,#557b76 54%,#bcc8aa); }
+.splash__logo { position:relative; width:86px; height:86px; margin:0 0 18px; font-size:0; border-radius:50%; background:radial-gradient(circle at 35% 30%,#f4dfad 0 7%,#b4864c 8% 44%,#4a3933 45% 100%); border:2px solid rgba(255,244,215,.72); box-shadow:0 3px 0 rgba(255,255,255,.35) inset,0 12px 0 rgba(22,48,53,.28),0 22px 36px rgba(15,31,35,.38); animation:atelierSway 5s ease-in-out infinite; }
+.splash__logo::before,.splash__logo::after { content:''; position:absolute; inset:20px; border:2px solid rgba(248,239,212,.8); border-radius:50%; }
+.splash__logo::after { inset:30px; background:#f8ecd0; border:0; box-shadow:0 0 0 5px rgba(180,134,76,.3); }
+.splash__title { font-family:'ZCOOL KuaiLe','Nunito',sans-serif; letter-spacing:.02em; text-shadow:0 2px 0 rgba(15,45,48,.3); }
+.splash__subtitle { color:rgba(246,240,219,.72); letter-spacing:.16em; }
+.splash__hint { color:rgba(246,240,219,.76); }
+@keyframes atelierSway { 0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)} }
+
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
+@media (max-width: 768px) { .atelier-route-card__intro { display:none; } .atelier-route-card__masthead { padding:14px; } .route-node__copy small { display:none; } }
+.level4-drum-hit-button { z-index:40; }
+
+/* 七音角色：统一釉面高光和接触阴影，不再靠随机装饰堆叠“可爱”。 */
+.fish-inner > .fish svg { filter: drop-shadow(0 5px 0 rgba(29,64,70,.16)) drop-shadow(0 10px 12px rgba(29,64,70,.12)); }
+.fish-inner > .fish svg .fish-body > ellipse:first-of-type { filter: saturate(.92); }
+.fish-inner > .fish svg .fish-body > ellipse:nth-of-type(2) { opacity:.34; }
+.fish-source-shadow { background:radial-gradient(ellipse at center, rgba(25,67,76,.35), transparent 70%); }
+.fish.is-floating { animation-timing-function:cubic-bezier(.45,0,.2,1); }
+
+/* 不让新增的工坊装饰破坏关卡实际点击层。 */
+.atelier-bg, .atelier-route-atmosphere, .atelier-bg__vignette { pointer-events:none !important; }

@@ -44,6 +44,7 @@ import { Pip } from '../components/Pip.js';
 import { LevelMap, LEVEL_META } from '../components/LevelMap.js';
 import particles from '../components/Particles.js';
 import { gsap } from 'gsap';
+import { icon } from '../utils/icons.js';
 
 /** C 大调 7 个白键的元数据 (color 用真实 hex, confetti 需要) */
 const NOTES = [
@@ -253,7 +254,7 @@ export class Game {
       // main.js 曾整体覆盖 __forestPiano，造成徽章永远停在硬编码的第一关。
       const meta = LEVEL_META.find((m) => m.id === levelId);
       if (meta) {
-        lb.textContent = `🗺️ 回地图 · 第 ${meta.id} 关`;
+        lb.innerHTML = `${icon('map')}<span>航线地图 · 第 ${meta.id} 关</span>`;
       }
     } catch (_) { /* localStorage 或 DOM 不在, 静默 */ }
   }
