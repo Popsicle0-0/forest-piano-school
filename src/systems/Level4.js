@@ -1,0 +1,542 @@
+/**
+ * Level 4: 节奏小河 + 鼓
+ *
+ * 系统预定义一段节奏 (ta + ti-ti 混合), 节奏泡泡从左向右流过屏幕,
+ * 孩子跟随节拍在泡泡到达大鼓位置时敲击屏幕中央的大鼓.
+ *
+ * 通关: 所有拍子处理完 (敲对或漏敲) 后显示星级.
+ *
+ * 反馈设计 (v15 polish):
+ *  - 泡泡到达鼓位: 大型红环脉动 + 鼓面色变金 + 鼓手鼓槌抬起 + 预响 audio.hover()
+ *  - 敲对: 鼓剧烈下沉 + 3 道外扩 ripples + 粒子迸溅 + 鼓手上挥 + "+1" 浮动
+ *  - 漏敲 / 错敲: 鼓震动 + 红色 "-1" 浮动闪现
+ *
+ * 音频:
+ *  - 预响 (泡泡到鼓位): game.audio.hover() — 轻盈气泡提示
+ *  - 敲对: game.audio.playNote('C4') (鼓声)
+ *  - 敲错 / 漏拍: game.audio.wrong()
+ *
+ * 关卡不参与 hud-dots (拖鱼进度点), 隐藏 level2-badges, 只显示通用重玩按钮.
+ */
+import { Level4Scene } from '../components/Level4Scene.js';
+
+// 节奏模式: 每个子数组是 4-5 拍短语, 用 'T' (ta=1 拍) 和 'tt' (ti-ti=2 拍) 混合.
+const RHYTHM_PATTERNS = [
+  // 关卡 1: 简单 4 拍
+  ['T', 'T', 'tt', 'T'],
+  // 关卡 2: 中等 6 拍
+  ['tt', 'T', 'T', 'tt', 'T', 'T'],
+  // 关卡 3: 复杂 10 拍
+  ['T', 'tt', 'T', 'tt', 'tt', 'T', 'T', 'T', 'tt', 'T'],
+];
+
+// 每拍时长 (ms): 慢节奏便于孩子跟随
+const BEAT_MS = 600;
+
+// 一个泡泡流过屏幕的总时长 (横向动画)
+const BUBBLE_FLOW_MS = 3800;
+
+// 泡泡流过的 Y 坐标 (泡泡容器高度的 30%, 在鼓上方)
+const BUBBLE_Y_PCT = 0.30;
+
+// 鼓所在 X 百分比 (容器水平中央 — 场景 SVG 用 xMidYMid slice, 鼓的水平中心
+// 经裁切后仍对齐容器中心, 所以这个百分比相对容器始终成立)
+const DRUM_X_PCT = 0.50;
+
+// 敲击时间窗 (ms): 泡泡到达时刻 ±250ms 内敲击算正确
+const HIT_WINDOW_MS = 260;
+
+// v19.5: 原 320ms cue 太短，儿童还没看清"该不该敲"就消失。
+// 延长为 620ms（包含命中窗口前后），状态卡会给出更直白的文字反馈。
+const CUE_PULSE_MS = 620;
+
+// 通关计算: 错 0/1=3⭐, 2-3=2⭐, 4-5=1⭐, 6+=0⭐
+function calcStars(wrongCount, totalBeats) {
+  // 漏敲也算错 (handled by 上面 wrongCount +=)
+  if (wrongCount <= 1) return 3;
+  if (wrongCount <= 3) return 2;
+  if (wrongCount <= 5) return 1;
+  return 0;
+}
+
+export default function startLevel4(game) {
+  if (typeof window !== 'undefined') {
+    window.__forestPiano = window.__forestPiano || {};
+    window.__forestPiano.currentLevelId = 4;
+  }
+
+  // 关卡 4 与关卡 2 类似: 不需要 hud-dots 拖鱼进度, 不需要 level2-badge
+  const hudLevel2 = document.getElementById('hud-level2');
+  if (hudLevel2) hudLevel2.style.display = 'none';
+  const hudDots = document.querySelector('.hud__dots');
+  if (hudDots) hudDots.style.display = '';
+
+  // 清空 wrongCount (Game.start 已重置, 但保险起见)
+  game.wrongCount = 0;
+
+  // 1) 创建场景
+  game.scene = new Level4Scene(game.stage);
+
+  // 2) 开场说明：先进入安全的教学演示，完成后才进入有计分的挑战。
+  game.say('先看一遍：只有泡泡碰到鼓的时候，才需要敲鼓~');
+  const isTeaching = !game.progress?.hasCompletedLevel?.(4);
+
+  // 3) 把所有节奏模式铺平为单拍序列 (T → 1 entry; tt → 2 entries)
+  const allBeats = [];
+  RHYTHM_PATTERNS.forEach((phrase) => {
+    phrase.forEach((p) => {
+      if (p === 'tt') {
+        allBeats.push({ double: true, isSecond: false });
+        allBeats.push({ double: true, isSecond: true });
+      } else {  // 'T'
+        allBeats.push({ double: false });
+      }
+    });
+  });
+
+  const total = allBeats.length;
+
+  // 关卡状态
+  game._level4Total = total;
+  game._level4Processed = 0;
+  game._level4Pending = [];
+  game._level4Done = false;
+  game._level4Correct = 0;
+  game._level4Timeouts = [];  // 收集所有 setTimeout 以便 teardown 时清理
+  game._level4CueTimers = []; // 收集 cue 脉动 setTimeout 以便 teardown 时清理
+  game._level4Teaching = isTeaching;
+  game._level4TutorialStep = isTeaching ? 0 : 2; // 0=观摩,1=带练,2=正式挑战
+  game._level4TutorialHits = 0;
+
+  // 4) 节奏说明卡 + 泡泡容器 + 流动几何
+  // v19.5: 旧版只让泡泡掠过，儿童没有明确的"现在敲/现在等"文本。
+  // 状态卡永远说清当前动作；颜色与鼓面 cue 同步。
+  game.stage.insertAdjacentHTML('beforeend', `
+    <div class="level4-rhythm-guide" role="status" aria-live="polite">
+      <div class="level4-rhythm-guide__label">${isTeaching ? '第 1 步：先看老师示范' : '节奏挑战'}</div>
+      <div class="level4-rhythm-guide__state">${isTeaching ? '👀 泡泡碰到鼓，才敲！' : '👀 看泡泡，等它碰到鼓'}</div>
+      <div class="level4-rhythm-guide__count">${isTeaching ? '现在不计分，先观察' : `节拍 0 / ${total}`}</div>
+    </div>
+    <div class="level4-bubbles-container"></div>
+  `);
+  const bubblesContainer = game.stage.querySelector('.level4-bubbles-container');
+  const rhythmGuide = game.stage.querySelector('.level4-rhythm-guide');
+  const rhythmState = rhythmGuide?.querySelector('.level4-rhythm-guide__state');
+  const rhythmCount = rhythmGuide?.querySelector('.level4-rhythm-guide__count');
+  const setRhythmGuide = (mode, text) => {
+    if (!rhythmGuide || !rhythmState) return;
+    rhythmGuide.dataset.state = mode;
+    rhythmState.textContent = text;
+  };
+  const updateRhythmCount = () => {
+    if (!rhythmCount) return;
+    if (game._level4TutorialStep === 0) rhythmCount.textContent = '现在不计分，先观察';
+    else if (game._level4TutorialStep === 1) rhythmCount.textContent = `跟着试两拍 ${game._level4TutorialHits} / 2`;
+    else rhythmCount.textContent = `节拍 ${game._level4Processed} / ${total}`;
+  };
+
+  // v19 布局核心: 泡泡容器是 #stage 内的 absolute 全覆盖层 — HUD 和底部气泡
+  // 已把视口空间分走, 用 window.innerWidth/innerHeight 算百分比得到的轨迹会
+  // 整体偏离容器, 泡泡的实际位置和鼓位 cue 时间窗对不上。
+  // 改为容器实测矩形推导 (getBoundingClientRect 会同步触发布局, 此处立即可靠)。
+  // 注: 泡泡是否到达鼓位由时间轴判定 (arriveMs + HIT_WINDOW_MS), 与屏幕坐标无关,
+  //     所以换坐标系只修正视觉轨迹, 不影响玩法节奏。
+  const flowBase = bubblesContainer || game.stage;   // 容器万一取不到时退回 stage 本身
+  const flowRect = flowBase.getBoundingClientRect();
+  const flowW = flowRect.width;
+  const flowH = flowRect.height;
+  // v20: 泡泡必须真实碰到鼓，而不是在舞台 30% 高的位置横穿、
+  // 到屏幕中线时让鼓突然亮。以实际鼓心转换到泡泡层坐标，减去半径
+  // 让 40px 泡泡中心正落在鼓面中心；横竖屏/安全区均自动对齐。
+  const drumScreen = game.scene.getDrumScreenCenter();
+  const drumX = drumScreen.x - flowRect.left - 20;
+  const yPos = drumScreen.y - flowRect.top - 20;
+  const startX = -50;
+  const endX = flowW + 100;
+  const drumOffset = (drumX - startX) / (endX - startX);
+
+  // ============================================================
+  // FX 辅助函数 (在 FX 层里 spawn DOM 元素)
+  // ============================================================
+  const fxLayer = game.scene.getFxLayer();
+  const drumAnchor = game.scene.getDrumAnchor();
+  const cueLarge = game.scene.getCueLarge();
+
+  // v19: getDrumScreenCenter() 返回的是 viewport 坐标, 而 ripples/particles/+1
+  // 全部挂在 fxLayer (#stage 内 absolute inset:0) 里 — 直接用会按 HUD 高度整体
+  // 错位。统一在这里换算成"层内坐标", 各 FX 生成函数只管消费。
+  function drumCenterInLayer() {
+    const c = game.scene.getDrumScreenCenter();
+    if (!fxLayer || typeof c.x !== 'number') return c;
+    const lr = fxLayer.getBoundingClientRect();
+    return { x: c.x - lr.left, y: c.y - lr.top };
+  }
+
+  // 在 drum 中心 spawn 3 道扩散 ripples
+  function spawnRipples() {
+    if (!fxLayer) return;
+    const c = drumCenterInLayer();
+    for (let i = 0; i < 3; i++) {
+      const ring = document.createElement('div');
+      ring.className = 'level4-drum-ripple level4-drum-ripple--' + (i + 1);
+      ring.style.left = c.x + 'px';
+      ring.style.top = c.y + 'px';
+      fxLayer.appendChild(ring);
+      setTimeout(() => ring.remove(), 900);
+    }
+  }
+
+  // 从 drum 中心迸溅彩色粒子 (drops)
+  function spawnParticles() {
+    if (!fxLayer) return;
+    const c = drumCenterInLayer();
+    const palette = ['#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ff9f1c'];
+    const count = 12;
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      p.className = 'level4-drum-particle';
+      const color = palette[Math.floor(Math.random() * palette.length)];
+      p.style.background = color;
+      p.style.boxShadow = '0 0 6px ' + color;
+      const ang = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const dist = 70 + Math.random() * 50;
+      const dx = Math.cos(ang) * dist;
+      const dy = Math.sin(ang) * dist - 30; // 略向上偏移 (像鼓敲的反弹)
+      p.style.setProperty('--dx', dx.toFixed(1) + 'px');
+      p.style.setProperty('--dy', dy.toFixed(1) + 'px');
+      p.style.left = c.x + 'px';
+      p.style.top = c.y + 'px';
+      const size = 6 + Math.random() * 6;
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      fxLayer.appendChild(p);
+      setTimeout(() => p.remove(), 700);
+    }
+  }
+
+  // 在 drum 上方 spawn "+1" 浮动分数 (绿色)
+  function spawnPlusOne() {
+    if (!fxLayer) return;
+    const c = drumCenterInLayer();
+    const t = document.createElement('div');
+    t.className = 'level4-floating-score level4-floating-score--plus';
+    t.textContent = '+1';
+    t.style.left = c.x + 'px';
+    t.style.top = (c.y - 50) + 'px';
+    fxLayer.appendChild(t);
+    setTimeout(() => t.remove(), 850);
+  }
+
+  // 在 drum 上方 spawn "-1" 红色浮动
+  function spawnMinusOne() {
+    if (!fxLayer) return;
+    const c = drumCenterInLayer();
+    const t = document.createElement('div');
+    t.className = 'level4-floating-score level4-floating-score--minus';
+    t.textContent = '-1';
+    t.style.left = c.x + 'px';
+    t.style.top = (c.y - 50) + 'px';
+    fxLayer.appendChild(t);
+    setTimeout(() => t.remove(), 850);
+  }
+
+  // 触发 "现在该敲了" 大型 cue (大红环 + 鼓面色变金 + 鼓手鼓槌抬起 + 预响)
+  function fireCueNow() {
+    if (game._level4Done) return;
+    // 大型红环 + 目标环 + 鼓面色变金 (by class, auto-removed after pulse)
+    if (drumAnchor) drumAnchor.classList.add('level4-cue-now');
+    if (cueLarge) cueLarge.classList.add('level4-cue-active');
+    const teachingText = game._level4TutorialStep === 0
+      ? '👀 看！泡泡碰到鼓了'
+      : '🥁 现在敲鼓！';
+    setRhythmGuide('hit', teachingText);
+    // 预响: 轻盈气泡, 提醒孩子准备敲
+    try { game.audio.hover(); } catch (_) {}
+    // 自动清除
+    const id = setTimeout(() => {
+      if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
+      if (cueLarge) cueLarge.classList.remove('level4-cue-active');
+    }, CUE_PULSE_MS);
+    game._level4CueTimers.push(id);
+  }
+
+  // 5) v20：一拍一拍推进，而不是把 27 拍同时排进 3.8 秒动画。
+  // 教学必须让“看 → 等 → 敲 → 反馈”有清楚因果；每次只存在一个 expected beat，
+  // 双连音也不会被一次点击吞掉两拍，旧定时器不能覆盖下一拍状态。
+  let nextBeatIndex = 0;
+  let activeBeat = null;
+
+  const finishLevel = () => {
+    if (game._level4Done) return;
+    game._level4Done = true;
+    game._level4Timeouts.push(setTimeout(() => {
+      const stars = calcStars(game.wrongCount, total);
+      try { game.progress.markLevelComplete(4, stars); } catch (_) {}
+      try { game.audio.playScale(['C4', 'D4', 'E4', 'G4', 'A4']); } catch (_) {}
+      try { game.showWinOverlay(stars, 4); } catch (_) {}
+    }, 700));
+  };
+
+  const scheduleNextBeat = (afterMs = 360) => {
+    if (game._level4Done) return;
+    if (nextBeatIndex >= total) {
+      finishLevel();
+      return;
+    }
+    const beat = allBeats[nextBeatIndex];
+    const idx = nextBeatIndex++;
+    game._level4Timeouts.push(setTimeout(() => spawnBubble(beat, idx), afterMs));
+  };
+
+  const resolveMiss = (idx) => {
+    if (game._level4Done || !activeBeat || activeBeat.idx !== idx) return;
+    game._level4Pending = [];
+    activeBeat = null;
+    game._level4Processed++;
+    updateRhythmCount();
+    if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
+    if (cueLarge) cueLarge.classList.remove('level4-cue-active');
+
+    if (game._level4TutorialStep === 0) {
+      // 第一次只看示范：自动敲鼓、绝不记错。
+      try { game.audio.playNote('C4'); } catch (_) {}
+      spawnRipples();
+      spawnParticles();
+      setRhythmGuide('teach', '✨ 看！泡泡碰到鼓，鼓就“咚”');
+      game.say('看见了吗？泡泡碰到鼓时，鼓亮起来、发出咚声。下一次轮到你试试！');
+      game._level4TutorialStep = 1;
+      if (rhythmGuide) rhythmGuide.querySelector('.level4-rhythm-guide__label').textContent = '第 2 步：等鼓亮，再敲两次';
+      updateRhythmCount();
+    } else {
+      game.wrongCount++;
+      try { game.audio.wrong(); } catch (_) {}
+      spawnMinusOne();
+      setRhythmGuide('miss', '❌ 漏了一拍，下一颗再试');
+      if (game._level4TutorialStep === 1) game.say('没关系，等鼓亮起来再敲一次~');
+    }
+    scheduleNextBeat(game._level4TutorialStep === 0 ? 800 : 420);
+  };
+
+  function spawnBubble(beat, absoluteIdx) {
+    if (!bubblesContainer || game._level4Done) return;
+    const bubble = document.createElement('div');
+    bubble.className = 'level4-bubble';
+    if (beat.double && beat.isSecond) bubble.classList.add('level4-bubble-half');
+    if (beat.double) bubble.classList.add('level4-bubble--double');
+    // 双拍用 1/2，而不是难辨的 • / ·。
+    bubble.textContent = beat.double ? (beat.isSecond ? '2' : '1') : '●';
+    bubblesContainer.appendChild(bubble);
+
+    try {
+      bubble.animate(
+        [
+          { transform: `translate(${startX}px, ${yPos}px)` },
+          { transform: `translate(${drumX}px, ${yPos}px)`, offset: drumOffset },
+          { transform: `translate(${endX}px, ${yPos}px)` },
+        ],
+        { duration: BUBBLE_FLOW_MS, fill: 'forwards', easing: 'linear' }
+      );
+    } catch (_) {
+      bubble.style.left = `${startX}px`;
+      bubble.style.top = `${yPos}px`;
+    }
+
+    const arriveMs = BUBBLE_FLOW_MS * drumOffset;
+    game._level4Timeouts.push(setTimeout(() => {
+      if (game._level4Done) return;
+      fireCueNow();
+      activeBeat = { beat, idx: absoluteIdx, when: Date.now(), bubble };
+      game._level4Pending = [activeBeat];
+      // 命中窗口结束立刻结算；不再等泡泡离屏数秒后才告诉孩子漏拍。
+      game._level4Timeouts.push(setTimeout(() => resolveMiss(absoluteIdx), HIT_WINDOW_MS));
+    }, arriveMs));
+    game._level4Timeouts.push(setTimeout(() => bubble.remove(), BUBBLE_FLOW_MS + 80));
+  }
+
+  scheduleNextBeat(800);
+
+  // 6) 大鼓点击 = 敲击
+  // v20.3: SVG 内部透明热区/复杂 sibling 的命中在 iOS PWA 上不稳定，
+  // 不能让儿童的主操作依赖它。下面额外创建一个真实 HTML button，按
+  // 鼓的屏幕矩形定位；SVG 只负责画鼓和动画，button 负责可靠接收触摸。
+  const drum = game.scene.getDrumAnchor();
+  const drumVisual = game.scene.getDrumVisual();
+  let drumHitButton = null;
+  let syncDrumHitButton = null;
+  let onDrumResize = null;
+  if (drum) {
+    drum.style.cursor = 'pointer';
+    drum.style.touchAction = 'manipulation';
+
+    // 原生按钮位于 stage 上层，扩大到实际鼓面周围 24px；不依赖
+    // SVG 的透明 fill、sibling 绘制顺序或 iOS SVG hit-test。
+    drumHitButton = document.createElement('button');
+    drumHitButton.type = 'button';
+    drumHitButton.className = 'level4-drum-hit-button';
+    drumHitButton.setAttribute('aria-label', '敲鼓');
+    drumHitButton.textContent = '';
+    game.stage.appendChild(drumHitButton);
+    syncDrumHitButton = () => {
+      if (!drumHitButton || !drumVisual || !game.stage) return;
+      const r = drumVisual.getBoundingClientRect();
+      const sr = game.stage.getBoundingClientRect();
+      const pad = 24;
+      drumHitButton.style.left = `${r.left - sr.left - pad}px`;
+      drumHitButton.style.top = `${r.top - sr.top - pad}px`;
+      drumHitButton.style.width = `${r.width + pad * 2}px`;
+      drumHitButton.style.height = `${r.height + pad * 2}px`;
+    };
+    syncDrumHitButton();
+    onDrumResize = () => requestAnimationFrame(syncDrumHitButton);
+    window.addEventListener('resize', onDrumResize);
+    window.addEventListener('orientationchange', onDrumResize);
+
+    const onTap = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (game._level4Done) return;
+
+      // 鼓强烈下沉 + shake (比原来更明显)
+      if (drumVisual) {
+        drumVisual.classList.remove('level4-drum-hit');
+        void drumVisual.offsetWidth;  // force reflow 重启动画
+        drumVisual.classList.add('level4-drum-hit');
+        game._level4Timeouts.push(setTimeout(() => {
+          drumVisual.classList.remove('level4-drum-hit');
+        }, 280));
+      }
+
+      // 鼓手鼓槌下挥动画
+      if (drumAnchor) {
+        drumAnchor.classList.remove('level4-drum-character-hit');
+        void drumAnchor.offsetWidth;
+        drumAnchor.classList.add('level4-drum-character-hit');
+        setTimeout(() => {
+          if (drumAnchor) drumAnchor.classList.remove('level4-drum-character-hit');
+        }, 280);
+      }
+
+      // 检查 pending 节拍
+      const now = Date.now();
+      const matched = game._level4Pending.filter((p) => Math.abs(now - p.when) < HIT_WINDOW_MS);
+      if (matched.length > 0) {
+        // 教学第二步要求先跟亮鼓成功两次；达到后才把状态卡收成小角标，
+        // 后续只保留鼓亮/泡泡的非文字线索，完成“先教学，后不提示”。
+        if (game._level4TutorialStep === 1) {
+          game._level4TutorialHits++;
+          if (game._level4TutorialHits >= 2) {
+            game._level4TutorialStep = 2;
+            if (rhythmGuide) {
+              rhythmGuide.classList.add('level4-rhythm-guide--compact');
+              rhythmGuide.querySelector('.level4-rhythm-guide__label').textContent = '节奏挑战';
+            }
+            setRhythmGuide('good', '🌟 学会啦，听鼓亮再敲！');
+            game.say('学会啦！接下来跟着泡泡和亮鼓自己试试~');
+          }
+          updateRhythmCount();
+        }
+
+        // 当前拍只结算一次，并立即推进下一拍。deadline 发现 activeBeat
+        // 已清空会自然失效，绝不把刚敲对的拍又判成漏拍。
+        game._level4Correct++;
+        game._level4Pending = [];
+        activeBeat = null;
+        game._level4Processed++;
+        updateRhythmCount();
+        try { game.audio.playNote('C4'); } catch (_) {}
+        spawnRipples();
+        spawnParticles();
+        spawnPlusOne();
+        if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
+        if (cueLarge) cueLarge.classList.remove('level4-cue-active');
+        const isChallenge = game._level4TutorialStep === 2;
+        setRhythmGuide('good', isChallenge ? '✅' : '✅ 对上啦！继续看下一颗');
+        const praises = ['咚!', '咚!咚!', '完美!', '棒呀!', '节拍对!'];
+        if (!isChallenge || game._level4TutorialHits === 2) {
+          game.say(praises[Math.min(game._level4Correct - 1, praises.length - 1)]);
+        }
+        game._level4Timeouts.push(setTimeout(() => {
+          setRhythmGuide('wait', isChallenge ? '🎵' : '👀 看下一颗泡泡，先等一等');
+        }, 560));
+        scheduleNextBeat(isChallenge ? 300 : 540);
+      } else {
+        // 教学观摩阶段的随手敲不处罚，只温柔提醒“等鼓亮”。
+        if (game._level4TutorialStep === 0) {
+          setRhythmGuide('teach', '👀 先等泡泡碰到鼓');
+          game.say('现在先看一看，等鼓亮起来再敲~');
+          return;
+        }
+        // 错敲: 无 pending 拍子匹配
+        game.wrongCount++;
+        try { game.audio.wrong(); } catch (_) {}
+        // 视觉反馈: 鼓单独震动 + -1 浮动
+        if (drumVisual) {
+          drumVisual.classList.add('level4-drum-shake');
+          setTimeout(() => drumVisual.classList.remove('level4-drum-shake'), 360);
+        }
+        spawnMinusOne();
+        // 清除 cue 状态 (避免持续变色)
+        if (drumAnchor) drumAnchor.classList.remove('level4-cue-now');
+        if (cueLarge) cueLarge.classList.remove('level4-cue-active');
+        setRhythmGuide('bad', '✋ 现在先别敲，等泡泡到鼓');
+        game.say('咦, 现在不是节拍! 看泡泡到鼓位再敲');
+        game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 看泡泡，等它碰到鼓'), 720));
+      }
+    };
+    // button 是唯一主触点；SVG anchor 仍保留样式，但不再负责接收主交互。
+    drumHitButton.addEventListener('pointerdown', onTap);
+    game._level4DrumHandler = onTap;
+  }
+
+  // 7) 重置 review 按钮点击: 直接调用 game.restartLevel() (入口在 main.js)
+  // Level4 没有 over-complicated HUD, 重玩按钮通用.
+
+  return () => {
+    // 清理所有 setTimeout
+    if (Array.isArray(game._level4Timeouts)) {
+      game._level4Timeouts.forEach((id) => clearTimeout(id));
+      game._level4Timeouts = [];
+    }
+    if (Array.isArray(game._level4CueTimers)) {
+      game._level4CueTimers.forEach((id) => clearTimeout(id));
+      game._level4CueTimers = [];
+    }
+    // 清 pending, 防止异步回调 in-flight 引用悬空
+    if (Array.isArray(game._level4Pending)) game._level4Pending = [];
+    game._level4Done = true;
+
+    // 解绑鼓事件与尺寸监听
+    if (game._level4DrumHandler && drumHitButton) {
+      drumHitButton.removeEventListener('pointerdown', game._level4DrumHandler);
+    }
+    if (onDrumResize) {
+      window.removeEventListener('resize', onDrumResize);
+      window.removeEventListener('orientationchange', onDrumResize);
+    }
+    if (drumHitButton) drumHitButton.remove();
+    game._level4DrumHandler = null;
+
+    // 拆场景
+    if (game.scene) {
+      try { game.scene.teardown(); } catch (_) {}
+      game.scene = null;
+    }
+
+    // 拆泡泡容器 (Game.start 的 stage.innerHTML='' 也兜底)
+    const containers = game.stage ? game.stage.querySelectorAll('.level4-bubbles-container') : [];
+    containers.forEach((c) => c.remove());
+
+    // 恢复 HUD 默认 (level1 样式)
+    const hudLevel2El = document.getElementById('hud-level2');
+    if (hudLevel2El) hudLevel2El.style.display = 'none';
+    const hudDotsEl = document.querySelector('.hud__dots');
+    if (hudDotsEl) hudDotsEl.style.display = '';
+    const btnReplayEl = document.getElementById('btn-replay');
+    if (btnReplayEl) btnReplayEl.style.display = '';
+
+    if (typeof window !== 'undefined') {
+      window.__forestPiano = window.__forestPiano || {};
+      window.__forestPiano.currentLevelId = null;
+    }
+  };
+}
