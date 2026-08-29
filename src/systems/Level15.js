@@ -85,6 +85,7 @@ export default function startLevel15(game) {
       left: 0;
       right: 0;
       bottom: 0;
+      z-index: 6; /* 高于不透明背景(z1)与读谱层(z5)，保证琴键可见可点 */
       height: var(--lv15-kb-h);
     }
     #stage > .keyboard-area > svg.keyboard {

@@ -77,6 +77,7 @@ export default function startLevel14(game) {
       left: 0;
       right: 0;
       bottom: 0;
+      z-index: 6; /* 高于不透明背景(z1)与场景内容(z5)，保证琴键可见可点 */
       height: var(--lv14-kb-h);
     }
     #stage > .keyboard-area > svg.keyboard {

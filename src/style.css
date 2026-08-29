@@ -1515,8 +1515,8 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 
 /* === 大鼓锚点 + 目标环 + cue 大环 === */
 .level4-drum-anchor {
-  pointer-events: auto;
-  /* 当 cue-now 激活, 让鼓面整体色偏金黄, 提示"现在该敲" */
+  pointer-events: none;
+  /* 鼓的视觉 SVG 不再接收主事件；触摸由原生 HTML 热区承接 */
 }
 /* 真实热区比鼓面稍大，视觉红环指向哪里，手指就能点哪里。 */
 .level4-drum-hit-area {
@@ -1527,6 +1527,24 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 .level4-drum-anchor {
   transition: filter 180ms ease-out;
 }
+/* v20.3: native HTML hit area for reliable iOS touch. */
+.level4-drum-hit-button {
+  position: absolute;
+  z-index: 20;
+  display: block;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.level4-drum-hit-button:active { background: rgba(255, 209, 102, 0.12); }
+.level4-drum-hit-area { pointer-events: none; }
 .level4-drum-anchor.level4-cue-now {
   filter: drop-shadow(0 0 18px rgba(255, 215, 0, 0.65))
           drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
@@ -3392,7 +3410,7 @@ button:active:not(:disabled),
   /* v18.9 修复: 固定 110×70px 改为响应式, 下限 60px 宽/44px 高
      (44px 是 iOS 人机指南推荐的最小可点击热区), 上限保持原设计 110px。
      5 键 + 4×14px gap + 32px padding 一起参与计算, 保证不会溢出容器。 */
-  width: clamp(60px, calc((100% - 32px - 4 * 14px) / 5), 110px);
+  width: clamp(44px, calc((100% - 32px - 4 * 14px) / 5), 110px);
   height: clamp(44px, 14vw, 70px);
   border: 3px solid rgba(155, 93, 229, 0.5);
   border-radius: 12px;
@@ -5721,6 +5739,20 @@ body.large-text .level-map-tile__desc { font-size: 13px !important; }
   50%      { transform: translate(680px, 110px) rotate(2deg); }
 }
 
+/* 短横屏：L16 的阶梯信息缩小到右侧，避免 300px 高 ladder 被 stage 裁切。 */
+@media (max-height: 520px) {
+  .level16-stage { padding: 64px 8px 8px; gap: 8px; }
+  .level16-meter { width: 82px; height: 132px; }
+  .level16-drum-wrap { width: 148px; height: 148px; }
+  .level16-ladder { right: 6px; padding: 6px 8px; gap: 3px; transform: translateY(-50%) scale(0.76); transform-origin: right center; }
+  .level16-ladder__title { font-size: 12px; }
+  .level16-hud { top: 4px; padding: 4px 10px; font-size: 12px; }
+}
+@media (orientation: portrait) and (max-width: 520px) {
+  .level16-stage { flex-direction: column; padding-top: 78px; }
+  .level16-ladder { position: static; transform: none; order: 3; max-width: 94%; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+}
+
 .level16-stage {
   position: absolute;
   inset: 0;
@@ -5845,6 +5877,8 @@ body.large-text .level-map-tile__desc { font-size: 13px !important; }
   position: absolute;
   right: 20px;
   top: 50%;
+  /* 这是展示信息，不应压住/吞掉鼓的点击。 */
+  pointer-events: none;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;

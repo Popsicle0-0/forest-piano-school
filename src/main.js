@@ -18,7 +18,7 @@ const theme = new ThemeSwitcher();
 const TUTORIAL_FLAG = 'forest-piano-tutorial-shown';
 
 // 当前版本号 - 部署时手动更新
-const APP_VERSION = 'v20.2';
+const APP_VERSION = 'v20.4';
 
 // 全局单例(便于控制台调试)
 // 保留 LevelMap / Game 模块初始化时挂上的调试元数据，不能整体覆盖。

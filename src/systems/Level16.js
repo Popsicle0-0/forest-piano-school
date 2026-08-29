@@ -151,7 +151,7 @@ export default function startLevel16(game) {
 
   function startPendulum(bpm) {
     if (game._level16Tween) {
-      gsap.killTweensOf(game._level16Tween);
+      game._level16Tween.kill();
       game._level16Tween = null;
     }
     const dur = 60 / bpm;  // 半周期秒
@@ -296,7 +296,7 @@ export default function startLevel16(game) {
     if (game._level16Round >= ROUNDS_TOTAL) {
       // 通关
       game._level16Done = true;
-      if (game._level16Tween) { gsap.killTweensOf(game._level16Tween); game._level16Tween = null; }
+      if (game._level16Tween) { game._level16Tween.kill(); game._level16Tween = null; }
       setTimeout(() => level16Win(), 800);
       return;
     }
@@ -361,7 +361,7 @@ export default function startLevel16(game) {
 
   return () => {
     if (game._level16Tween) {
-      try { gsap.killTweensOf(game._level16Tween); } catch (_) {}
+      try { game._level16Tween.kill(); } catch (_) {}
       game._level16Tween = null;
     }
     window.removeEventListener('keydown', onKey);

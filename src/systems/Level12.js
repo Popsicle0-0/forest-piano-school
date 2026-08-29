@@ -205,7 +205,7 @@ export default function startLevel12(game) {
   // 用 GSAP 让 pendulum 的 rotation 在 -ANGLE_AMP ↔ +ANGLE_AMP 反复 (yoyo)
   function startPendulum(bpm) {
     if (game._level12Tween) {
-      gsap.killTweensOf(game._level12Tween);
+      game._level12Tween.kill();
       game._level12Tween = null;
     }
     const dur = 60 / bpm;  // 单摆半周期 = 60/BPM 秒 (一次完整左右 = 2*dur)
@@ -360,7 +360,7 @@ export default function startLevel12(game) {
   game.say('看摆杆 — 摆到中间时"切"! 按得快又准就是节奏高手~');
 
   function level12Win() {
-    if (game._level12Tween) { gsap.killTweensOf(game._level12Tween); game._level12Tween = null; }
+    if (game._level12Tween) { game._level12Tween.kill(); game._level12Tween = null; }
     const acc = game._level12TotalCuts > 0
       ? game._level12Hits / game._level12TotalCuts
       : 0;
@@ -385,7 +385,7 @@ export default function startLevel12(game) {
 
   return () => {
     if (game._level12Tween) {
-      try { gsap.killTweensOf(game._level12Tween); } catch (_) {}
+      try { game._level12Tween.kill(); } catch (_) {}
       game._level12Tween = null;
     }
     window.removeEventListener('keydown', onKey);

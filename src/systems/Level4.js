@@ -356,15 +356,41 @@ export default function startLevel4(game) {
   scheduleNextBeat(800);
 
   // 6) 大鼓点击 = 敲击
-  // v20.2: 事件必须绑在 anchor 父组，而不是透明圆或鼓面子元素。
-  // SVG 采用"后绘制元素压在前绘制元素上"的命中规则：透明 hit circle
-  // 是较早 sibling，鼓皮/绳子会截走 touch，事件不会横向冒泡给它。
-  // 绑 anchor 后，无论点鼓皮、红圈、边缘，pointerdown 都由父组统一收到。
+  // v20.3: SVG 内部透明热区/复杂 sibling 的命中在 iOS PWA 上不稳定，
+  // 不能让儿童的主操作依赖它。下面额外创建一个真实 HTML button，按
+  // 鼓的屏幕矩形定位；SVG 只负责画鼓和动画，button 负责可靠接收触摸。
   const drum = game.scene.getDrumAnchor();
   const drumVisual = game.scene.getDrumVisual();
+  let drumHitButton = null;
+  let syncDrumHitButton = null;
+  let onDrumResize = null;
   if (drum) {
     drum.style.cursor = 'pointer';
     drum.style.touchAction = 'manipulation';
+
+    // 原生按钮位于 stage 上层，扩大到实际鼓面周围 24px；不依赖
+    // SVG 的透明 fill、sibling 绘制顺序或 iOS SVG hit-test。
+    drumHitButton = document.createElement('button');
+    drumHitButton.type = 'button';
+    drumHitButton.className = 'level4-drum-hit-button';
+    drumHitButton.setAttribute('aria-label', '敲鼓');
+    drumHitButton.textContent = '';
+    game.stage.appendChild(drumHitButton);
+    syncDrumHitButton = () => {
+      if (!drumHitButton || !drumVisual || !game.stage) return;
+      const r = drumVisual.getBoundingClientRect();
+      const sr = game.stage.getBoundingClientRect();
+      const pad = 24;
+      drumHitButton.style.left = `${r.left - sr.left - pad}px`;
+      drumHitButton.style.top = `${r.top - sr.top - pad}px`;
+      drumHitButton.style.width = `${r.width + pad * 2}px`;
+      drumHitButton.style.height = `${r.height + pad * 2}px`;
+    };
+    syncDrumHitButton();
+    onDrumResize = () => requestAnimationFrame(syncDrumHitButton);
+    window.addEventListener('resize', onDrumResize);
+    window.addEventListener('orientationchange', onDrumResize);
+
     const onTap = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -457,7 +483,8 @@ export default function startLevel4(game) {
         game._level4Timeouts.push(setTimeout(() => setRhythmGuide('wait', '👀 看泡泡，等它碰到鼓'), 720));
       }
     };
-    drum.addEventListener('pointerdown', onTap);
+    // button 是唯一主触点；SVG anchor 仍保留样式，但不再负责接收主交互。
+    drumHitButton.addEventListener('pointerdown', onTap);
     game._level4DrumHandler = onTap;
   }
 
@@ -478,10 +505,15 @@ export default function startLevel4(game) {
     if (Array.isArray(game._level4Pending)) game._level4Pending = [];
     game._level4Done = true;
 
-    // 解绑鼓事件
-    if (game._level4DrumHandler && drum) {
-      drum.removeEventListener('pointerdown', game._level4DrumHandler);
+    // 解绑鼓事件与尺寸监听
+    if (game._level4DrumHandler && drumHitButton) {
+      drumHitButton.removeEventListener('pointerdown', game._level4DrumHandler);
     }
+    if (onDrumResize) {
+      window.removeEventListener('resize', onDrumResize);
+      window.removeEventListener('orientationchange', onDrumResize);
+    }
+    if (drumHitButton) drumHitButton.remove();
     game._level4DrumHandler = null;
 
     // 拆场景

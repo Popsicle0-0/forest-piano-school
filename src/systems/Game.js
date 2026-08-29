@@ -146,6 +146,9 @@ export class Game {
    * 这让新增关卡无需修改 Game.js — 直接添加 src/systems/LevelN.js 文件即可.
    */
   start({ levelId }) {
+    // v20.4: Game 自己持有当前关卡身份，重玩/回地图不依赖可能被模块
+    // 覆盖的 window 调试对象。
+    this.currentLevelId = levelId;
     // 关闭所有 overlay (含通关遮罩 / 关卡地图 / 自由演奏 / 歌曲库 / 教程 / 设置 / 成就墙 / 快捷键帮助 / streak toast)
     // v18.8: 修复"两个钢琴"bug — 之前只清 .overlay, PracticeRoom/SongLibrary 残留在 document.body 上浮着
     document.querySelectorAll(
@@ -1125,7 +1128,7 @@ export class Game {
     // v20: HUD ↻ 不再是 L1 专用 reset。L3/L4/L5 等独立关卡有自己的
     // closure 状态、计时器和场景，局部 reset 会留下旧节拍/旧音符。
     // 当前关不是 L1/L2 时统一走 start() 的 teardown→清场→重建链路。
-    const currentId = window.__forestPiano?.currentLevelId || 1;
+    const currentId = this.currentLevelId || window.__forestPiano?.currentLevelId || 1;
     if (currentId > 2) {
       this._skipStartOverlayOnce = true;
       this.start({ levelId: currentId });

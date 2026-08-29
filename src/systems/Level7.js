@@ -130,10 +130,8 @@ export default function startLevel7(game) {
       const ty = tr.top + tr.height / 2;
 
       // 鱼飞过去 (相对位置)
-      const curLeft = parseFloat(fish.style.left) || 0;
-      const curTop = parseFloat(fish.style.top) || 0;
-      const dx = tx - fr.left - curLeft;
-      const dy = ty - fr.top - curTop;
+      const dx = tx - (fr.left + fr.width / 2);
+      const dy = ty - (fr.top + fr.height / 2);
 
       // 飘带颜色 — 鱼的颜色
       const ribbonColor = (fishNote && fishNote.color) || '#ffd166';
